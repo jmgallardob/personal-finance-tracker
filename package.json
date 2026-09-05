@@ -10,14 +10,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{json,ts,mjs}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"*.{json,ts,mjs}\"",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css}\" \"*.{json,ts,mjs}\" \".github/**/*.yml\" \".secretlintrc.json\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css}\" \"*.{json,ts,mjs}\" \".github/**/*.yml\" \".secretlintrc.json\"",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build"
+    "security:secrets": "secretlint --format github \"**/*\"",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build && npm run security:secrets"
   },
   "dependencies": {
     "next": "16.3.4",
@@ -25,6 +26,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@secretlint/secretlint-rule-preset-recommend": "^13.0.5",
     "@tailwindcss/postcss": "^4.2.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -37,6 +39,7 @@
     "jsdom": "^28.1.0",
     "prettier": "^3.8.2",
     "prettier-plugin-tailwindcss": "^0.7.2",
+    "secretlint": "^13.0.5",
     "tailwindcss": "^4.2.1",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0"
