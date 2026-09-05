@@ -256,9 +256,9 @@ de destino no permite merge con checks pendientes o fallidos.
 ### Flujo de ramas
 
 ```text
-feature/* o fix/* ──PR + CI──> main
-                                  │
-                                  └── futuro PR + CI ──> stable
+feature/*, fix/* o chore/* ──PR + CI──> main
+                                              │
+                                              └── futuro PR + CI ──> stable
 ```
 
 La existencia de `stable`, el despliegue desde ella y cualquier ejecución
