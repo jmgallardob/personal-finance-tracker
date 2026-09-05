@@ -22,9 +22,8 @@ public service.
 
 ## Project status
 
-The MVP definition has been completed and accepted. The project is currently in
-the documentation and planning stage; application development has not started
-yet.
+The MVP definition has been completed and accepted. The initial application
+scaffolding is in place and product development is ready to begin.
 
 ## Product documentation
 
@@ -51,3 +50,19 @@ The documentation is currently the source of truth for the project:
 Create the first functional prototype using the documented visual conventions
 and complete the remaining decisions from phase 0 of the
 [implementation plan](docs/06-plan-implementacion.md).
+
+## Local development
+
+The project requires Node.js 24 and npm.
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://localhost:3000` to view the application. Run all local quality
+checks with:
+
+```bash
+npm run check
+```

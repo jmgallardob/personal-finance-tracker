@@ -46,6 +46,7 @@ Examples:
 
    - New functionality: `feature/<descriptive-name>`.
    - Incident or defect correction: `fix/<descriptive-name>`.
+   - Maintenance, tooling, or scaffolding: `chore/<descriptive-name>`.
 
 6. `<descriptive-name>` must contain three or four English lowercase words in
    kebab-case, with no spaces or underscores. Examples:
@@ -53,9 +54,10 @@ Examples:
    - `feature/add-recurring-transactions`
    - `feature/show-monthly-average-metrics`
    - `fix/prevent-duplicate-recurring-entries`
+   - `chore/initial-project-scaffolding`
 
-If the task cannot clearly be classified as functionality or a fix, ask the user
-which branch type to use before continuing.
+If the task cannot clearly be classified as functionality, a fix, or a chore,
+ask the user which branch type to use before continuing.
 
 If uncommitted changes prevent safe branch creation, do not hide or discard them.
 Stop and ask the user for instructions.
@@ -104,6 +106,7 @@ Those rules are mandatory. In particular:
 
    - Functionality: `feat: <short descriptive title>`.
    - Fix: `fix: <short descriptive title>`.
+   - Maintenance, tooling, or scaffolding: `chore: <short descriptive title>`.
 
 5. When working on an authorized task branch, push the branch and set its
    upstream when needed:

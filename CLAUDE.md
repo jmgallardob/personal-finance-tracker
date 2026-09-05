@@ -18,19 +18,22 @@ Operational summary:
    `feature/<three-or-four-word-descriptive-name>`.
 7. For an incident or defect correction, create
    `fix/<three-or-four-word-descriptive-name>`.
-8. Use English lowercase kebab-case for the descriptive branch name.
-9. Preserve unrelated changes and never include them in the task commit.
-10. Read the project design document and the local Revolut reference files before
+8. For maintenance, tooling, or scaffolding, create
+   `chore/<three-or-four-word-descriptive-name>`.
+9. Use English lowercase kebab-case for the descriptive branch name.
+10. Preserve unrelated changes and never include them in the task commit.
+11. Read the project design document and the local Revolut reference files before
     modifying UI. Treat them as inspiration, with the project design taking
     precedence.
-11. Before touching tests, coverage, test configuration, or related CI, read and
+12. Before touching tests, coverage, test configuration, or related CI, read and
     obey the strict integrity rules in `docs/05-tests-qa.md`. Never manipulate
     coverage; require meaningful assertions and report line/branch coverage.
-12. Run and validate all relevant tests before finishing.
-13. Use `feat: <short English title>` for functionality and
-   `fix: <short English title>` for fixes.
-14. Push an authorized task branch after committing.
-15. Do not create a pull request unless the user explicitly requests one. If
+13. Run and validate all relevant tests before finishing.
+14. Use `feat: <short English title>` for functionality,
+   `fix: <short English title>` for fixes, and
+   `chore: <short English title>` for maintenance, tooling, or scaffolding.
+15. Push an authorized task branch after committing.
+16. Do not create a pull request unless the user explicitly requests one. If
     requested, write all PR metadata and review discussion in English.
 
 If this summary differs from `AGENTS.md`, `AGENTS.md` takes precedence.

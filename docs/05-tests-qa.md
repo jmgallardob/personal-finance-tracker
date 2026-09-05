@@ -1,6 +1,6 @@
 # Tests y QA
 
-**Estado:** aceptado v1.7 para el MVP
+**Estado:** aceptado v1.8 para el MVP
 
 **Objetivo:** demostrar que el historial y todas sus representaciones producen
 resultados correctos después de cada mutación.
@@ -223,8 +223,8 @@ abstractas.
 
 ## CI
 
-GitHub Actions será el proveedor de CI. Esta sección documenta el flujo futuro;
-el MVP documental no crea todavía archivos en `.github/workflows/`.
+GitHub Actions es el proveedor de CI. El flujo inicial está implementado en
+`.github/workflows/ci.yml` y crecerá junto a las suites del producto.
 
 ### Disparador
 
@@ -240,15 +240,19 @@ merge.
 
 ### Checks obligatorios del PR
 
-Cada actualización del PR ejecutará:
+Cada actualización del PR ejecuta desde el scaffolding inicial:
 
 1. formato, lint y TypeScript;
 2. tests unitarios;
-3. migraciones e integración sobre SQLite aislado;
+3. cobertura con todos los umbrales obligatorios;
 4. build de producción;
-5. suite E2E crítica;
-6. cobertura con todos los umbrales obligatorios;
-7. escaneo de secretos y dependencias.
+5. escaneo de secretos;
+6. auditoría de dependencias.
+
+Las migraciones y pruebas de integración sobre SQLite aislado se añadirán cuando
+exista el primer esquema. La suite E2E crítica se añadirá con el primer flujo
+vertical ejecutable. No se crean pasos vacíos ni checks que puedan aprobar sin
+ejercitar comportamiento real.
 
 Estos checks son obligatorios y deben pasar antes de aceptar el PR. La rama
 de destino no permite merge con checks pendientes o fallidos.
@@ -256,9 +260,9 @@ de destino no permite merge con checks pendientes o fallidos.
 ### Flujo de ramas
 
 ```text
-feature/* o fix/* ──PR + CI──> main
-                                  │
-                                  └── futuro PR + CI ──> stable
+feature/*, fix/* o chore/* ──PR + CI──> main
+                                              │
+                                              └── futuro PR + CI ──> stable
 ```
 
 La existencia de `stable`, el despliegue desde ella y cualquier ejecución
