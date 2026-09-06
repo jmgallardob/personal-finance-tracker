@@ -64,9 +64,12 @@ Se adoptan la tercera y la cuarta opción, con estas reglas finales:
 8. La confirmación explica cuántas entradas atrasadas se crearán y con qué
    valores; si la recuperación falla, el cambio no se aplica y el reintento no
    duplica ninguna fecha.
-9. La demostración vive en un archivo SQLite propio con el mismo esquema,
-   seleccionado por una cookie de sesión; salir devuelve a los datos personales
-   existentes sin copiarlos ni borrarlos, y si están vacíos se empieza de cero.
+9. La demostración vive en un archivo SQLite propio con el mismo esquema. Lo
+   selecciona una cookie de sesión que solo contiene un valor de modo acotado,
+   validado en el servidor y resuelto contra dos rutas configuradas; la cookie
+   nunca lleva una ruta ni un identificador de espacio de trabajo. Salir
+   devuelve a los datos personales existentes sin copiarlos ni borrarlos, y si
+   están vacíos se empieza de cero.
 10. El reinicio actúa solo sobre la demostración, exige confirmación y se
     coordina con las escrituras en curso; la tarea de recurrencias personal no
     procesa la demostración.
@@ -107,7 +110,7 @@ programada mantiene idempotente cualquier reintento.
   conflicto y ofrecer el camino de editar o desactivar la regla.
 - Editar o desactivar puede crear movimientos como efecto previo, así que la
   confirmación tiene que anunciarlos antes de ejecutarse.
-- El despliegue gestiona dos archivos SQLite y sus copias de seguridad.
+- El despliegue pasa a operar con dos archivos SQLite en lugar de uno.
 - Si en el futuro se permitieran reactivar reglas o recurrencias no mensuales,
   esta decisión debería sustituirse por otra ADR.
 

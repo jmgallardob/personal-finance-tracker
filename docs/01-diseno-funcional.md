@@ -391,8 +391,11 @@ El aislamiento es de almacenamiento, no solo de presentación:
 
 - la demostración vive en un archivo de base de datos propio, con el mismo
   esquema que los datos personales;
-- la sesión del navegador decide qué conjunto se está usando, y la interfaz
-  muestra de forma visible que se trata de datos de demostración;
+- la sesión del navegador decide qué conjunto se está usando mediante un valor
+  de modo acotado —personal o demostración— que el servidor valida en cada
+  petición; la sesión nunca transporta ni elige una ruta de archivo o un
+  identificador de espacio, y la interfaz muestra de forma visible cuándo se
+  trata de datos de demostración;
 - salir de la demostración devuelve a los datos personales tal como estaban: no
   se copia ni se borra nada, y si aún no existe ningún movimiento personal se
   empieza de cero;

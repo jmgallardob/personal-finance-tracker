@@ -301,8 +301,15 @@ generador pueda partir por la mitad.
 
 - La demostración usa un archivo SQLite propio con el mismo esquema y las mismas
   migraciones que el archivo personal; no hay tablas ni columnas de modo.
-- Una cookie de sesión decide qué archivo abre cada petición; salir de la
-  demostración vuelve al archivo personal existente sin copiar ni borrar datos.
+- Una cookie de sesión decide qué archivo abre cada petición. Su contenido es un
+  valor de modo acotado, `personal` o `demo`, validado en el servidor contra ese
+  conjunto cerrado; cualquier otro contenido no es un modo válido.
+- El servidor resuelve ese modo contra dos rutas de base de datos fijas de su
+  configuración. La cookie nunca transporta, compone ni elige una ruta de
+  archivo ni un identificador de espacio de trabajo, de modo que no existe
+  entrada del cliente que pueda dirigir la aplicación a otro archivo.
+- Salir de la demostración vuelve al archivo personal existente sin copiar ni
+  borrar datos.
 - El reinicio actúa exclusivamente sobre el archivo de demostración, exige
   confirmación explícita y se coordina con las escrituras en curso para no
   truncar una transacción.
