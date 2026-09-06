@@ -49,8 +49,8 @@ Se adopta la segunda opción con estas reglas finales:
    80, y 20 etiquetas por movimiento.
 5. Los nombres se recortan, se normalizan a Unicode NFC, colapsan sus espacios
    internos y se comparan en minúsculas conservando las tildes.
-6. Concepto y nota conservan tildes y espaciado interno; se rechazan los
-   controles no imprimibles salvo los saltos de línea de la nota.
+6. Concepto y nota conservan las tildes; se rechazan los controles no
+   imprimibles salvo los saltos de línea de la nota.
 7. El tipo de una categoría es inmutable; cambiar el tipo de un movimiento exige
    una categoría activa compatible.
 8. Al editar se puede conservar la categoría o las etiquetas archivadas que el

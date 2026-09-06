@@ -82,9 +82,8 @@ el esquema inicial.
   recortando, aplicando Unicode NFC, colapsando espacios internos y pasando a
   minúsculas sin eliminar diacríticos.
 - `category.type` es inmutable: ninguna mutación del MVP lo modifica.
-- Longitudes máximas en puntos de código sobre el texto ya normalizado:
-  concepto 200, nota 2.000, nombre de categoría o tag 80, y como mucho 20 filas
-  de `TransactionTag` por movimiento.
+- Longitudes máximas: concepto 200 caracteres, nota 2.000, nombre de categoría
+  o tag 80, y como mucho 20 filas de `TransactionTag` por movimiento.
 - El archivado conserva asociaciones históricas.
 - Cada mutación y sus asociaciones se confirman en una transacción SQL.
 - Cada movimiento automático guarda `recurring_rule_id` y `scheduled_for`; una
@@ -105,9 +104,10 @@ antes de serializar un total en JSON. Cuando la suma exacta supera
 `Number.MAX_SAFE_INTEGER` la consulta devuelve un error controlado en lugar de
 un número impreciso; ninguna capa convierte céntimos a coma flotante para sumar.
 
-La normalización de texto se aplica en el dominio antes de validar longitudes y
-antes de escribir. Los caracteres de control no imprimibles se rechazan; la nota
-es el único campo que admite saltos de línea y los normaliza a `\n`.
+La normalización de nombres se aplica en el dominio antes de comprobar la
+unicidad y antes de escribir. Concepto y nota conservan sus tildes. Los
+caracteres de control no imprimibles se rechazan en concepto, nota y nombres; la
+nota es el único campo que admite saltos de línea.
 
 ## Capas
 

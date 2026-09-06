@@ -89,10 +89,6 @@ El signo no se introduce manualmente: el tipo determina si el movimiento suma a
 ingresos o gastos. Las fechas futuras se reservan para un futuro módulo de
 planificación.
 
-Los límites de texto se cuentan en puntos de código Unicode después de
-aplicar la normalización descrita más abajo, no sobre el texto tal como se
-tecleó.
-
 ### Importes aceptados y formato de entrada
 
 El importe se teclea con convención española: la coma separa los decimales y el
@@ -139,10 +135,9 @@ una cifra aproximada.
   conservando las tildes: `Café` y `café` son el mismo nombre, pero `cafe` y
   `café` son nombres distintos. Se conserva la forma escrita por el usuario
   para mostrarla.
-- Concepto y nota: se recortan los extremos y se normalizan a Unicode NFC,
-  conservando tildes, mayúsculas y espacios internos.
+- Concepto y nota: conservan las tildes tal como se escriben.
 - Se rechazan los caracteres de control no imprimibles en todos estos campos. La
-  única excepción son los saltos de línea de la nota, que se guardan como `\n`.
+  única excepción son los saltos de línea de la nota.
 - Un nombre que quede vacío tras normalizar se rechaza como campo obligatorio.
 
 ### Duplicar un movimiento
@@ -175,7 +170,7 @@ movimientos no se elimina: se archiva y sigue apareciendo en el histórico.
 - Renombrar respeta la unicidad del nombre normalizado entre las categorías
   activas del mismo tipo y no altera importes ni asociaciones.
 - El orden se define solo entre las categorías activas de un mismo tipo; las
-  archivadas quedan fuera de la ordenación y conservan su posición anterior.
+  archivadas quedan fuera de la ordenación.
 - El nombre de una categoría admite hasta 80 caracteres.
 
 ### Etiquetas
