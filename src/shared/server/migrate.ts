@@ -4,7 +4,9 @@
  * Migrations are applied only when this module is called, never when a
  * connection is opened and never during a request. Each file runs in its own
  * transaction; the journal row is written in that same transaction so a failed
- * file is rolled back and never recorded as successful.
+ * file is rolled back and never recorded as successful. A later run that finds
+ * the same tag skips it only when the SHA-256 of the SQL file still matches
+ * the committed hash; a changed file is a controlled error and applies nothing.
  */
 
 import "server-only";
@@ -29,7 +31,8 @@ export type MigrationErrorCode =
   | "journalMissing"
   | "invalidJournal"
   | "migrationFileMissing"
-  | "migrationFailed";
+  | "migrationFailed"
+  | "checksumMismatch";
 
 /** Controlled failure while applying migrations. */
 export interface MigrationError {
@@ -94,6 +97,13 @@ export function applyMigrations(
       .get(entry.tag) as { hash: string } | undefined;
 
     if (existing) {
+      if (existing.hash !== hash) {
+        return {
+          ok: false,
+          error: { code: "checksumMismatch", tag: entry.tag },
+        };
+      }
+
       skipped.push(entry.tag);
       continue;
     }

@@ -1,13 +1,16 @@
-import { existsSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import { resolvePersonalWorkspace } from "../../src/modules/preferences/server/workspace";
 import { loadAppConfig } from "../../src/shared/server/config";
 import {
   closeSqliteConnection,
   openSqliteConnection,
 } from "../../src/shared/server/database";
+import { initializeDatabase } from "../../src/shared/server/initialize";
 import {
   DEFAULT_MIGRATIONS_FOLDER,
   SCHEMA_MIGRATION_TABLE,
@@ -64,6 +67,18 @@ function recordedTags(connection: ReturnType<typeof requireOpen>): string[] {
     .map((row) => (row as { tag: string }).tag);
 }
 
+function recordedLedger(connection: ReturnType<typeof requireOpen>) {
+  return connection.sqlite
+    .prepare(
+      `SELECT tag, hash FROM ${SCHEMA_MIGRATION_TABLE} ORDER BY applied_at`,
+    )
+    .all() as Array<{ tag: string; hash: string }>;
+}
+
+function sha256(text: string): string {
+  return createHash("sha256").update(text).digest("hex");
+}
+
 describe("applyMigrations", () => {
   it("applies the committed journal to a fresh database", () => {
     const { filePath } = temporarySqliteFile();
@@ -88,8 +103,12 @@ describe("applyMigrations", () => {
     connection.close();
   });
 
-  it("skips already applied files after a restart", () => {
+  it("skips already applied files after a restart when the hash matches", () => {
     const { filePath } = temporarySqliteFile();
+    const sqlText = readFileSync(
+      join(DEFAULT_MIGRATIONS_FOLDER, "0000_workspace_and_preference.sql"),
+      "utf8",
+    );
     const first = requireOpen(filePath);
     expect(applyMigrations(first).ok).toBe(true);
     first.close();
@@ -104,7 +123,90 @@ describe("applyMigrations", () => {
         skipped: ["0000_workspace_and_preference"],
       },
     });
-    expect(recordedTags(second)).toEqual(["0000_workspace_and_preference"]);
+    expect(recordedLedger(second)).toEqual([
+      {
+        tag: "0000_workspace_and_preference",
+        hash: sha256(sqlText),
+      },
+    ]);
+    second.close();
+  });
+
+  it("rejects a changed applied file without touching schema, data or ledger", () => {
+    const { folder } = temporaryMigrationFolder();
+    const originalSql = `CREATE TABLE probe (id INTEGER PRIMARY KEY, label TEXT NOT NULL);
+--> statement-breakpoint
+INSERT INTO probe (id, label) VALUES (1, 'original');`;
+    writeMigrationJournal(folder, [{ tag: "0000_ok", sql: originalSql }]);
+
+    const { filePath } = temporarySqliteFile();
+    const first = requireOpen(filePath);
+    expect(applyMigrations(first, folder)).toEqual({
+      ok: true,
+      value: { applied: ["0000_ok"], skipped: [] },
+    });
+    const ledger = recordedLedger(first);
+    first.close();
+
+    writeFileSync(
+      join(folder, "0000_ok.sql"),
+      `${originalSql}
+--> statement-breakpoint
+CREATE TABLE rewritten (id INTEGER PRIMARY KEY);`,
+    );
+
+    const second = requireOpen(filePath);
+    const result = applyMigrations(second, folder);
+
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "checksumMismatch", tag: "0000_ok" },
+    });
+    expect(recordedLedger(second)).toEqual(ledger);
+    expect(second.sqlite.prepare("SELECT id, label FROM probe").all()).toEqual([
+      { id: 1, label: "original" },
+    ]);
+    expect(
+      second.sqlite
+        .prepare(
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'rewritten'",
+        )
+        .get(),
+    ).toBeUndefined();
+    second.close();
+  });
+
+  it("stops initializeDatabase before bootstrap when an applied file changes", () => {
+    const { folder } = temporaryMigrationFolder();
+    writeMigrationJournal(folder, [
+      {
+        tag: "0000_ok",
+        sql: "CREATE TABLE probe (id INTEGER PRIMARY KEY, label TEXT NOT NULL);",
+      },
+    ]);
+
+    const { filePath } = temporarySqliteFile();
+    const first = requireOpen(filePath);
+    expect(applyMigrations(first, folder).ok).toBe(true);
+    first.close();
+
+    writeFileSync(
+      join(folder, "0000_ok.sql"),
+      "CREATE TABLE probe (id INTEGER PRIMARY KEY, label TEXT NOT NULL, extra TEXT);",
+    );
+
+    const second = requireOpen(filePath);
+    const result = initializeDatabase(second, { migrationsFolder: folder });
+
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "checksumMismatch", tag: "0000_ok" },
+    });
+    expect(resolvePersonalWorkspace(second)).toEqual({
+      ok: false,
+      error: { code: "workspaceNotFound" },
+    });
+    expect(recordedTags(second)).toEqual(["0000_ok"]);
     second.close();
   });
 
