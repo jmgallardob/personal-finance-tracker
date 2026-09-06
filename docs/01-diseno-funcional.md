@@ -1,6 +1,6 @@
 # Diseño funcional
 
-**Estado:** aceptado v1.7
+**Estado:** aceptado v1.8
 
 **Alcance:** MVP de registro, recurrencias mensuales y visualización de finanzas
 cotidianas.
@@ -200,7 +200,10 @@ mes es la unidad temporal más pequeña para agrupaciones y comparaciones.
 
 La evolución mensual utiliza una ventana propia: mes actual más los 11 meses
 anteriores o, si existe menos histórico, desde el mes del primer movimiento. No
-cambia al seleccionar otro periodo para las tarjetas.
+cambia al seleccionar otro periodo para las tarjetas. Los meses sin movimientos
+dentro de esa ventana se dibujan a cero para no comprimir el eje temporal; si no
+existe ningún movimiento, la evolución muestra un estado vacío en lugar de una
+serie de ceros.
 
 Las comparaciones evitan enfrentar periodos parciales con periodos completos:
 
@@ -210,6 +213,32 @@ Las comparaciones evitan enfrentar periodos parciales con periodos completos:
 - año actual hasta hoy frente al mismo intervalo del año anterior;
 - rango personalizado de meses completos frente al bloque inmediatamente
   anterior con el mismo número de meses.
+
+Un intervalo parcial llega hasta el mismo día ordinal en ambos extremos. Cuando
+el intervalo anterior no contiene ese día, su extremo se limita al último día de
+su mes; el intervalo actual nunca se recorta. Los dos intervalos realmente
+comparados se rotulan en la interfaz.
+
+| Periodo activo | Intervalo actual | Intervalo comparado |
+| --- | --- | --- |
+| Mes actual a 31 de marzo, año no bisiesto | 1–31 de marzo | 1–28 de febrero |
+| Mes actual a 31 de marzo, año bisiesto | 1–31 de marzo | 1–29 de febrero |
+| Mes actual a 31 de mayo | 1–31 de mayo | 1–30 de abril |
+| Mes actual a 15 de marzo | 1–15 de marzo | 1–15 de febrero |
+| Año actual a 29 de febrero, año bisiesto | 1 de enero–29 de febrero | 1 de enero–28 de febrero del año anterior |
+| Mes anterior completo, marzo | 1–31 de marzo | 1–28 o 1–29 de febrero |
+
+El cambio porcentual se calcula como `(actual − anterior) ÷ valor absoluto del
+anterior`. El valor absoluto evita que un balance neto negativo invierta el
+signo del cambio.
+
+| Anterior | Actual | Cambio mostrado |
+| --- | --- | --- |
+| 400,00 € | 500,00 € | +25,00 % |
+| 200,00 € | 150,00 € | −25,00 % |
+| −100,00 € | −50,00 € | +50,00 % |
+| 0,00 € | 250,00 € | sin porcentaje; se muestra “Sin base de comparación” |
+| 0,00 € | 0,00 € | 0,00 % |
 
 La composición es fija e incluye:
 
@@ -233,6 +262,28 @@ La selección solo decide qué series o barras aparecen: no altera ingresos,
 gastos, balance, medias globales ni el filtro del historial. Los elementos sin
 datos en la ventana correspondiente no dibujan una barra. Con cero elementos
 seleccionados se muestra un estado vacío y el acceso “Seleccionar todas”.
+
+- Las categorías y etiquetas archivadas con datos en la ventana están
+  disponibles en su selector, marcadas como archivadas, y no aparecen
+  seleccionadas al principio. Sus importes siguen contando en ingresos, gastos,
+  balance y medias globales aunque su barra no se dibuje.
+- Mientras el usuario no haya interactuado manualmente con un selector, los
+  elementos activos que se creen después se añaden a su selección. Tras la
+  primera interacción manual se conserva la elección del usuario durante la
+  sesión.
+
+Ejemplo: la categoría `gimnasio` se archiva en marzo después de acumular 120 €
+de gasto en febrero. En una ventana que incluya febrero, esos 120 € siguen
+sumando al gasto total y a la media; la barra de `gimnasio` solo aparece cuando
+el usuario selecciona esa categoría archivada.
+
+El desglose por etiquetas muestra además el grupo **Sin etiquetas** siempre que
+la ventana contenga gasto sin ninguna etiqueta. No es una etiqueta guardada en
+la base de datos, sino un grupo calculado que también figura como entrada
+seleccionable del selector de etiquetas. Al abrir su detalle, el historial
+recibe un filtro de gasto sin etiquetar, mutuamente excluyente con el filtro por
+etiqueta: no se pueden pedir a la vez movimientos sin etiquetas y movimientos de
+una etiqueta concreta.
 
 No se muestra saldo. El balance neto es únicamente `ingresos − gastos` dentro del
 periodo seleccionado.
@@ -258,6 +309,30 @@ categoría aplica la misma división a cada categoría. La media por etiqueta
 atribuye el importe completo a cada tag, por lo que sus grupos pueden solaparse.
 El balance neto medio es `(ingresos − gastos) de la ventana ÷ meses incluidos`.
 Cada visualización indica explícitamente la ventana utilizada.
+
+Cada media conserva su suma exacta en céntimos y su divisor. El redondeo al
+céntimo más próximo es solo de presentación y aplica la regla de la mitad
+alejándose de cero, también con valores negativos. Ninguna cifra se obtiene
+sumando medias ya redondeadas: un total se calcula siempre desde las sumas
+exactas.
+
+| Ventana | Suma exacta | Media exacta | Media mostrada |
+| --- | --- | --- | --- |
+| 3 meses, gasto total | 1.000,00 € | 333,333… € | 333,33 € |
+| 2 meses, gasto total | 1.000,01 € | 500,005 € | 500,01 € |
+| 2 meses, balance neto | −1.000,01 € | −500,005 € | −500,01 € |
+| 2 meses, categoría `casa` | 100,01 € | 50,005 € | 50,01 € |
+| 2 meses, categoría `ocio` | 100,01 € | 50,005 € | 50,01 € |
+| 2 meses, gasto total de esas dos categorías | 200,02 € | 100,01 € | 100,01 € |
+
+En ese ejemplo las dos medias mostradas suman 100,02 €, un céntimo más que la
+media total mostrada. La cifra correcta es 100,01 €, porque procede de la suma
+exacta; la interfaz no debe derivar totales sumando lo que muestra.
+
+Un gasto de 60 € con las etiquetas `viajes` y `con amigos` aporta 60 € a cada
+grupo y 60 € al gasto total. En una ventana de dos meses, la media de cada
+etiqueta es 30 € y la media de gasto total también 30 €: la suma de las medias
+por etiqueta, 60 €, no es la media total.
 
 ### Datos de demostración
 
@@ -332,6 +407,26 @@ de demostración no deben mezclarse accidentalmente con datos personales.
     archivadas que ya tenía, pero no asignarle otras archivadas distintas.
 23. Duplicar copia los valores y la fecha del movimiento de origen y nunca su
     regla de recurrencia ni su vencimiento generado.
+24. Una comparación llega hasta el mismo día ordinal en ambos intervalos; si el
+    intervalo anterior no contiene ese día, su extremo se limita al último día
+    de su mes. Los dos intervalos comparados se rotulan.
+25. El cambio porcentual es `(actual − anterior) ÷ valor absoluto del anterior`.
+    Con anterior cero y actual distinto de cero no hay porcentaje y se indica
+    “Sin base de comparación”; con ambos valores a cero el cambio es 0 %.
+26. Las medias conservan la suma exacta y el divisor; el redondeo al céntimo más
+    próximo, con la mitad alejándose de cero también en negativos, es solo de
+    presentación y nunca se suman medias ya redondeadas.
+27. La evolución mensual dibuja a cero los meses sin movimientos de su ventana y
+    muestra un estado vacío cuando no existe ningún movimiento.
+28. “Sin etiquetas” es un grupo calculado de gasto sin etiquetar y no una
+    etiqueta almacenada; su detalle se abre con un filtro propio del historial
+    que excluye el filtro por etiqueta.
+29. Las clasificaciones archivadas con datos en la ventana aparecen marcadas en
+    su selector y no seleccionadas por defecto; sus importes siguen contando en
+    totales y medias globales.
+30. Los elementos activos creados después se añaden a la selección mientras el
+    usuario no haya interactuado manualmente con ese selector; después se
+    conserva su elección durante la sesión.
 
 ## Fuera del MVP
 

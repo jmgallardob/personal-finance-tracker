@@ -1,6 +1,6 @@
 # Diseño técnico
 
-**Estado:** aceptado v1.6 para el MVP
+**Estado:** aceptado v1.7 para el MVP
 
 **Enfoque:** monolito modular privado, desplegable como una única aplicación.
 
@@ -132,6 +132,9 @@ Presentación → Aplicación → Dominio
 - La búsqueda cubre concepto y nota, con escape y normalización apropiados.
 - Los filtros combinan `dateFrom`, `dateTo`, tipo, categoría, texto y tags.
 - Al seleccionar varios tags se aplica semántica OR.
+- `untagged=true` selecciona los movimientos sin ninguna etiqueta y es
+  mutuamente excluyente con el filtro por etiqueta: recibir ambos es un error de
+  validación, no una intersección vacía.
 
 `dateFrom` y `dateTo` son fechas ISO sin hora en el contrato, se aplican de
 forma inclusiva y son opcionales independientemente. Se validan en el servidor y
@@ -160,6 +163,12 @@ multiplicar accidentalmente ingresos/gastos generales. En la agregación por tag
 el importe completo se atribuye a cada tag asociado. La API indicará que los
 grupos se solapan y que su suma no representa el gasto total.
 
+El gasto sin etiquetas se calcula como un grupo aparte de la agregación por tag,
+sin crear ninguna fila artificial en `Tag`. Los desgloses por categoría y por
+tag incluyen los elementos archivados que tengan importe en la ventana y los
+marcan como archivados; la selección de la UI decide qué se dibuja, nunca qué
+se suma.
+
 La consulta de medias determina en `Europe/Madrid` el último mes natural cerrado
 y toma hasta 12 meses, comenzando como pronto en el primer mes natural completo
 posterior al primer movimiento. Genera explícitamente la serie de meses para
@@ -167,15 +176,31 @@ incluir meses sin datos con valor cero. Si la ventana está vacía devuelve
 `insufficientHistory`, no importes cero. La respuesta incluye `windowStart`,
 `windowEnd` y `monthCount` para que la UI pueda explicar el cálculo.
 
+Cada media viaja como suma exacta en céntimos y divisor de meses, no como una
+cifra ya redondeada. El redondeo al céntimo más próximo, con la mitad alejándose
+de cero también en negativos, ocurre solo al presentar. Ningún total se obtiene
+sumando medias redondeadas.
+
 La serie de evolución es independiente del selector principal y comprende el mes
-actual más hasta 11 meses anteriores. Para el mes actual, la comparación usa los
-mismos días del mes anterior; los demás presets emplean los periodos completos o
-intervalos equivalentes definidos funcionalmente.
+actual más hasta 11 meses anteriores, con los meses sin datos materializados a
+cero; cuando no existe ningún movimiento, la serie se devuelve vacía en lugar de
+una sucesión de ceros.
+
+La comparación con el periodo anterior recorre ambos intervalos hasta el mismo
+día ordinal y limita el extremo del intervalo anterior al último día de su mes
+cuando ese día no existe. La respuesta incluye los cuatro extremos realmente
+comparados para que la UI pueda rotularlos. El cambio porcentual es
+`(actual − anterior) ÷ abs(anterior)`; con `anterior = 0` y `actual ≠ 0`
+devuelve `null` junto a un motivo que la UI traduce como “Sin base de
+comparación”, y con ambos valores a cero devuelve `0`.
 
 Las selecciones de categorías y tags se aplican sobre las series de desglose ya
 devueltas o mediante parámetros específicos de visualización. Un estado por
 dimensión se comparte entre su distribución del periodo y su media mensual. No se
-reutiliza como filtro de la consulta de totales. Esta separación evita que una
+reutiliza como filtro de la consulta de totales. La selección inicial contiene
+los elementos activos; los archivados llegan marcados y sin seleccionar, y un
+elemento activo nuevo entra en la selección mientras el usuario no haya
+interactuado manualmente con ese selector. Esta separación evita que una
 selección parcial cambie accidentalmente ingresos, gastos, balance o medias
 globales. El estado se conserva durante la sesión y no requiere persistencia en
 base de datos en el MVP.

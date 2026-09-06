@@ -17,6 +17,8 @@ vez aceptado; una nueva decisión puede sustituirlo.
 - [ADR 0001 — SQLite para el MVP](0001-sqlite-para-mvp.md) — aceptado.
 - [ADR 0002 — Límites, normalización y clasificación](0002-limites-normalizacion-y-clasificacion.md)
   — aceptado.
+- [ADR 0003 — Ventanas, medias y desgloses](0003-ventanas-medias-y-desgloses.md)
+  — aceptado.
 - Workspace implícito como límite para futura información compartida.
 - Topología de despliegue privado sin autenticación y acceso mediante VPN.
 - Semántica y presentación de agregaciones con múltiples tags.
