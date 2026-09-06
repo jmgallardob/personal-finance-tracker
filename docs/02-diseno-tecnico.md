@@ -1,6 +1,6 @@
 # Diseño técnico
 
-**Estado:** aceptado v1.7 para el MVP
+**Estado:** aceptado v1.8 para el MVP
 
 **Enfoque:** monolito modular privado, desplegable como una única aplicación.
 
@@ -63,6 +63,11 @@ Esto no implica construir UI multiusuario ni permisos durante el MVP.
 - `TransactionTag`: relación muchos-a-muchos entre movimiento y etiqueta.
 - `RecurringRule`: plantilla mensual, día objetivo, próxima fecha, estado y fecha
   de desactivación.
+- `RecurringOccurrence`: constancia de que una regla ya procesó una fecha de
+  vencimiento. Guarda la regla, la fecha programada y un enlace anulable al
+  movimiento creado; no guarda importe ni ningún otro dato personal. Es una
+  ampliación del esquema introducida al aceptar estas reglas, no una tabla que
+  el diseño ya recogiese.
 
 No existen tablas `Account`, `Balance`, `Transfer`, `Budget` ni `ImportBatch` en
 el esquema inicial.
@@ -88,6 +93,14 @@ el esquema inicial.
 - Cada mutación y sus asociaciones se confirman en una transacción SQL.
 - Cada movimiento automático guarda `recurring_rule_id` y `scheduled_for`; una
   restricción única sobre ambos campos impide duplicar un vencimiento.
+- `RecurringOccurrence` es único por `(recurring_rule_id, scheduled_for)` y
+  sobrevive al borrado de su movimiento: en ese caso su enlace queda nulo y la
+  fecha no vuelve a generarse.
+- Un movimiento de origen tiene como mucho una `RecurringRule` activa.
+- Una regla desactivada no vuelve al estado activo; el MVP no expone reactivar
+  ni borrar reglas.
+- No se puede archivar una categoría o un tag referenciado por la plantilla de
+  una regla activa.
 
 ## Contrato de validación de importes y texto
 
@@ -250,7 +263,8 @@ claramente la transacción afectada.
 1. Una tarea programada obtiene reglas activas con `next_due_date <= hoy`, usando
    la fecha actual de `Europe/Madrid`.
 2. Por cada vencimiento pendiente abre una transacción SQL y crea el movimiento
-   con una copia de la plantilla y de sus tags.
+   con una copia de la plantilla y de sus tags, junto con su
+   `RecurringOccurrence`.
 3. La restricción `(recurring_rule_id, scheduled_for)` hace idempotente cualquier
    reintento o ejecución concurrente.
 4. Calcula el próximo mes utilizando el día objetivo o su último día disponible.
@@ -258,7 +272,42 @@ claramente la transacción afectada.
 
 La tarea se ejecuta al menos diariamente y también al arrancar la aplicación. El
 dashboard solo consulta movimientos materializados; una regla nunca cuenta como
-gasto o ingreso previsto.
+gasto o ingreso previsto. La tarea recorre únicamente el conjunto de datos
+personales.
+
+Borrar un movimiento generado elimina el movimiento y sus asociaciones, pero
+conserva su `RecurringOccurrence` con el enlace a nulo, de modo que esa fecha
+queda procesada para siempre. Borrar el movimiento de origen no toca la regla.
+
+### Editar o desactivar una regla
+
+1. Abrir una transacción SQL y tomar la regla para escritura, de forma que el
+   generador no pueda intercalarse.
+2. Revalidar dentro de esa transacción los vencimientos pendientes hasta hoy y
+   la versión de la plantilla leída por la interfaz; si no coinciden, abortar y
+   pedir reintento.
+3. Materializar esos vencimientos pendientes con la plantilla anterior.
+4. Aplicar la edición o la desactivación y recalcular `next_due_date` como una
+   fecha estrictamente futura.
+5. Confirmar. Cualquier fallo deja la regla y sus vencimientos como estaban; el
+   reintento es idempotente porque la unicidad de
+   `(recurring_rule_id, scheduled_for)` impide repetir una fecha.
+
+El punto de corte es ese bloqueo serializado: la recuperación de atrasados y el
+cambio de plantilla ocurren en la misma transacción, nunca en dos pasos que el
+generador pueda partir por la mitad.
+
+## Aislamiento de la demostración
+
+- La demostración usa un archivo SQLite propio con el mismo esquema y las mismas
+  migraciones que el archivo personal; no hay tablas ni columnas de modo.
+- Una cookie de sesión decide qué archivo abre cada petición; salir de la
+  demostración vuelve al archivo personal existente sin copiar ni borrar datos.
+- El reinicio actúa exclusivamente sobre el archivo de demostración, exige
+  confirmación explícita y se coordina con las escrituras en curso para no
+  truncar una transacción.
+- La tarea de recurrencias de los datos personales no abre el archivo de
+  demostración.
 
 ## Seguridad y privacidad
 

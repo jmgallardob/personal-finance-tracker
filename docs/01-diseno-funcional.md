@@ -1,6 +1,6 @@
 # Diseño funcional
 
-**Estado:** aceptado v1.8
+**Estado:** aceptado v1.9
 
 **Alcance:** MVP de registro, recurrencias mensuales y visualización de finanzas
 cotidianas.
@@ -63,15 +63,62 @@ cada vencimiento hasta que se desactive la recurrencia.
 - Editar un movimiento ya generado no modifica la plantilla ni otros meses.
 - Los movimientos generados se distinguen mediante un indicador discreto y se
   comportan como cualquier otro movimiento para edición, eliminación y cálculos.
-- Desactivar o eliminar una recurrencia detiene futuras generaciones, pero no
-  elimina el movimiento original ni las entradas ya creadas.
+- Desactivar una recurrencia detiene futuras generaciones, pero no elimina el
+  movimiento original ni las entradas ya creadas. El MVP no ofrece borrar una
+  regla ni reactivarla: desactivar es irreversible desde la interfaz.
 - Si el servidor estaba apagado, al volver a ejecutarse crea todos los
   vencimientos omitidos hasta la fecha actual, exactamente una vez por fecha.
+- Un movimiento de origen admite como mucho una regla activa a la vez.
 
 La sección Movimientos incluye las pestañas **Todos** y **Recurrentes**. En
 Recurrentes se muestran las plantillas activas con tipo, concepto/categoría,
 importe, tags, día mensual y próxima fecha. Desde allí se pueden editar o
 desactivar después de una confirmación.
+
+#### Eliminar y duplicar entradas generadas
+
+Eliminar una entrada ya generada la retira del historial y de las estadísticas,
+pero no vuelve a crearse: la aplicación conserva la constancia de que ese
+vencimiento se procesó, sin guardar el importe ni el resto de datos personales y
+con el enlace al movimiento vacío. La regla sigue activa y su próxima fecha no
+cambia.
+
+Eliminar el movimiento de origen tampoco detiene la regla: la plantilla vive en
+la recurrencia, no en ese movimiento. Duplicar una entrada generada produce un
+movimiento manual normal, sin regla ni vencimiento asociados.
+
+#### Archivar una clasificación usada por una recurrencia
+
+No se puede archivar una categoría o una etiqueta mientras una regla activa la
+utilice. La aplicación rechaza la operación con un conflicto que identifica la
+regla implicada y pide editarla o desactivarla antes. Así se evita suspender en
+silencio un pago mensual o dejar la plantilla apuntando a una clasificación que
+ya no puede asignarse.
+
+#### Editar o desactivar con vencimientos atrasados
+
+Antes de aplicar una edición o una desactivación, la aplicación genera los
+vencimientos pendientes hasta hoy con la plantilla anterior. Solo después guarda
+el cambio y recalcula la próxima fecha, que siempre es estrictamente futura. La
+confirmación indica cuántas entradas atrasadas se van a crear y con qué valores,
+para que el usuario no descubra después movimientos que creía cancelados.
+
+Si esa recuperación falla, el cambio no se aplica: la regla queda exactamente
+como estaba y se puede reintentar sin que ninguna fecha se duplique.
+
+#### Tabla de eventos
+
+| Evento | Antes | Después |
+| --- | --- | --- |
+| Eliminar una entrada generada | regla activa; el vencimiento consta procesado y enlazado a su movimiento | el movimiento sale del historial y de los totales; el vencimiento sigue constando, sin importe y sin enlace, y no se regenera |
+| Eliminar el movimiento de origen | regla activa creada desde ese movimiento | la regla sigue activa y generando; solo desaparece ese movimiento |
+| Duplicar una entrada generada | entrada enlazada a su regla | copia manual sin regla ni vencimiento; la regla no cambia |
+| Archivar una categoría o etiqueta usada por una regla activa | clasificación activa en uso | operación rechazada con un conflicto que nombra la regla; nada cambia |
+| Archivarla tras editar o desactivar esa regla | ninguna regla activa la usa | se archiva y el histórico conserva sus asociaciones |
+| Editar una plantilla con vencimientos atrasados | regla activa con fechas pendientes hasta hoy | primero se crean los atrasados con la plantilla anterior; después se guarda el cambio y la próxima fecha es futura |
+| Desactivar una regla con vencimientos atrasados | regla activa con fechas pendientes hasta hoy | se crean esos atrasados con la plantilla anterior; después la regla queda desactivada y no genera nada más |
+| Fallar la recuperación de atrasados | regla activa | el cambio no se aplica; la regla queda igual y el reintento no duplica ninguna fecha |
+| Desactivar una regla | regla activa | deja de generar de forma irreversible desde la interfaz; el movimiento original y las entradas creadas permanecen |
 
 ### Datos de un movimiento
 
@@ -340,6 +387,27 @@ La aplicación incluye un conjunto de datos mock, claramente identificable y
 reemplazable, que permite explorar todos los componentes del dashboard. Los datos
 de demostración no deben mezclarse accidentalmente con datos personales.
 
+El aislamiento es de almacenamiento, no solo de presentación:
+
+- la demostración vive en un archivo de base de datos propio, con el mismo
+  esquema que los datos personales;
+- la sesión del navegador decide qué conjunto se está usando, y la interfaz
+  muestra de forma visible que se trata de datos de demostración;
+- salir de la demostración devuelve a los datos personales tal como estaban: no
+  se copia ni se borra nada, y si aún no existe ningún movimiento personal se
+  empieza de cero;
+- reiniciar la demostración solo afecta al conjunto de demostración, exige una
+  confirmación explícita y se coordina con las escrituras en curso;
+- la tarea automática de recurrencias de los datos personales nunca procesa el
+  conjunto de demostración.
+
+| Evento | Antes | Después |
+| --- | --- | --- |
+| Entrar en la demostración | sesión sobre datos personales | la sesión pasa al archivo de demostración; los datos personales quedan intactos |
+| Salir de la demostración | sesión sobre la demostración | vuelve a los datos personales existentes, sin copiar ni borrar; si están vacíos, se empieza de cero |
+| Reiniciar la demostración | archivo de demostración modificado | solo ese archivo vuelve a su contenido reproducible, previa confirmación |
+| Ejecutarse la tarea de recurrencias | reglas activas en ambos conjuntos | procesa únicamente las reglas de los datos personales |
+
 ## Historias y criterios de aceptación
 
 | ID | Historia | Criterio principal de aceptación |
@@ -427,6 +495,26 @@ de demostración no deben mezclarse accidentalmente con datos personales.
 30. Los elementos activos creados después se añaden a la selección mientras el
     usuario no haya interactuado manualmente con ese selector; después se
     conserva su elección durante la sesión.
+31. No se puede archivar una categoría o etiqueta que use una regla activa; la
+    operación se rechaza identificando esa regla, que debe editarse o
+    desactivarse antes.
+32. Eliminar una entrada generada no la vuelve a crear: la constancia del
+    vencimiento se conserva sin importe y con el enlace al movimiento vacío.
+33. Eliminar el movimiento de origen no detiene su regla, y duplicar una entrada
+    generada produce un movimiento manual sin regla ni vencimiento.
+34. Un movimiento de origen admite como mucho una regla activa, y desactivar una
+    regla es irreversible desde la interfaz del MVP.
+35. Editar o desactivar una regla genera antes los vencimientos pendientes hasta
+    hoy con la plantilla anterior; después aplica el cambio y fija una próxima
+    fecha estrictamente futura, explicando en la confirmación las entradas
+    atrasadas que se crearán.
+36. Si esa recuperación falla, el cambio no se aplica y el reintento no duplica
+    ninguna fecha.
+37. La demostración usa un archivo de base de datos propio con el mismo esquema,
+    seleccionado por la sesión; salir conserva los datos personales y reiniciar
+    afecta solo a la demostración.
+38. La tarea automática de recurrencias de los datos personales no procesa el
+    conjunto de demostración.
 
 ## Fuera del MVP
 

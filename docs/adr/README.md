@@ -19,6 +19,8 @@ vez aceptado; una nueva decisión puede sustituirlo.
   — aceptado.
 - [ADR 0003 — Ventanas, medias y desgloses](0003-ventanas-medias-y-desgloses.md)
   — aceptado.
+- [ADR 0004 — Recurrencias y demostración](0004-ciclo-de-vida-de-recurrencias-y-demo.md)
+  — aceptado.
 - Workspace implícito como límite para futura información compartida.
 - Topología de despliegue privado sin autenticación y acceso mediante VPN.
 - Semántica y presentación de agregaciones con múltiples tags.
