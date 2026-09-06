@@ -10,6 +10,75 @@ multiple agents and worktrees.
 The project owner remains the final authority for product decisions, pull request
 approval, and merge authorization.
 
+## Orca as the orchestration layer
+
+Orca is the provider-agnostic orchestration layer for this workflow. It owns the
+coordination runtime and launches agent CLIs; it is not itself the implementation
+agent or a replacement for GitHub. A coordinator can assign different areas to
+Codex, Claude Code, Cursor CLI, Gemini, OpenCode, or another supported CLI without
+changing the task contract or Git workflow. Integration depth and model controls
+vary by agent, so the coordinator records the effective launch configuration.
+
+The relevant Orca concepts are:
+
+| Orca concept | Meaning in this project                                                                              |
+| ------------ | ---------------------------------------------------------------------------------------------------- |
+| **Run**      | One coordination namespace for an implementation session and its coordinator inbox.                  |
+| **Task**     | A logical work item mapped to a private-board ID such as `TX-02`.                                    |
+| **Dispatch** | One concrete attempt to execute a Task. A retry creates a new Dispatch without duplicating the Task. |
+| **Worker**   | The CLI agent process that implements a Dispatch in its assigned worktree.                           |
+| **Message**  | Heartbeats, questions, escalations, and completion reports exchanged through Orca.                   |
+| **Gate**     | A coordinator-owned decision that blocks dependent Tasks until it is resolved.                       |
+
+The execution relationship is:
+
+```text
+Orca Run
+  ├── private-board task TX-02
+  │    ├── Dispatch 1 → Codex worker → failed
+  │    └── Dispatch 2 → Claude worker → worker_done
+  └── Gate → pending product decision
+```
+
+The coordinator creates or selects the Run, creates Tasks with dependencies,
+launches Workers, consumes messages, and validates output. A Worker reports that
+it has finished; it does not decide that a task is verified, that a PR is
+mergeable, or that a product requirement is accepted.
+
+For an isolated area, the coordinator should launch a new worktree and choose the
+agent and model explicitly when supported:
+
+```bash
+orca orchestration worker-start \
+  --task <orca-task-id> \
+  --worktree new-child \
+  --name transaction-services \
+  --agent codex \
+  --model <provider-model-id> \
+  --effort high \
+  --json
+```
+
+`--agent` selects the CLI harness, `--model` is an opaque model identifier for
+that harness, and `--effort` is valid only when the selected agent/model supports
+it. The project policy is therefore agent-neutral: use the strongest suitable
+worker for the area, but keep the same task scope, tests, commits, evidence, and
+review gates. Provider authentication and model availability remain host
+configuration, not secrets to place in this repository.
+
+Workers use Orca's structured completion protocol. A completion message includes
+the Orca `taskId`, its `dispatchId`, outcome, summary, tests, coverage, remaining
+gaps, blockers, and next action. Long-running workers send heartbeats; questions
+use the coordinator message channel; unresolved product choices become Gates
+rather than guesses. If a worker fails, retry the same logical Task with a new
+Dispatch and retain the failure evidence.
+
+The current Orca flow is `Run` plus `worker-start`. Do not rely on legacy
+coordinator start/stop commands if the installed Orca version reports them as
+retired. See the [Orca orchestration guide](https://www.onorca.dev/docs/cli/orchestration)
+and [supported agents](https://www.onorca.dev/docs/agents/supported) for
+provider-specific launch behavior.
+
 ## Sources of truth
 
 | Information                         | Source of truth                                 | Editor                                         |
@@ -191,11 +260,12 @@ Suggested next task:
 ```
 
 The report must contain observed results, never planned commands presented as if
-they ran. If direct agent-to-coordinator messaging is unavailable, the agent
-returns the same report to the project owner for forwarding.
+they ran. If Orca messaging is unavailable, the agent returns the same report to
+the project owner or coordinator for forwarding; the task is not considered
+verified until the coordinator has observable evidence.
 
-The coordinator checks the branch, diff, commit, tests, coverage, and task contract.
-It then updates the private board:
+The coordinator checks the branch, diff, commit, tests, coverage, Orca Dispatch
+receipt, and task contract. It then updates the private board:
 
 - `VERIFICADA` when implementation and evidence satisfy the task;
 - `BLOQUEADA` with a concrete owner and next action when progress cannot continue;
@@ -269,8 +339,9 @@ but they never edit those files. The coordinator updates the board:
 - after confirming integration into `main`.
 
 The coordinator records responsible agent, branch, commit, commands, coverage,
-uncovered paths, blocker, next action, pull request, and integration evidence. It
-does not invent missing SHAs, test results, or timestamps.
+uncovered paths, Orca agent/model/effort, Dispatch ID, blocker, next action, pull
+request, and integration evidence. It does not invent missing SHAs, Dispatch IDs,
+test results, or timestamps.
 
 The single-editor restriction is operational rather than a Unix permission: all
 agents on the VPS normally use the same operating-system account. If the project
