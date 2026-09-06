@@ -1,13 +1,42 @@
 @import "tailwindcss";
 
-:root {
+@theme {
   --color-surface: #000000;
   --color-surface-deep: #0a0a0a;
   --color-surface-raised: #16181a;
+  --color-surface-hover: #1f2226;
   --color-text: #ffffff;
-  --color-text-muted: rgba(255, 255, 255, 0.72);
+  --color-text-muted: rgb(255 255 255 / 0.72);
   --color-primary: #494fdf;
-  --color-border: rgba(255, 255, 255, 0.12);
+  --color-primary-bright: #4f55f1;
+  --color-income: #00a87e;
+  --color-expense: #e61e49;
+  --color-danger: #e23b4a;
+  --color-border: rgb(255 255 255 / 0.12);
+
+  --font-sans: "Inter Variable", Inter, system-ui, sans-serif;
+
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.4;
+  --text-body-sm: 0.875rem;
+  --text-body-sm--line-height: 1.43;
+  --text-body: 1rem;
+  --text-body--line-height: 1.5;
+  --text-body-lg: 1.125rem;
+  --text-body-lg--line-height: 1.56;
+  --text-heading-sm: 1.25rem;
+  --text-heading-sm--line-height: 1.4;
+  --text-heading: 1.5rem;
+  --text-heading--line-height: 1.33;
+  --text-heading-lg: 2rem;
+  --text-heading-lg--line-height: 1.19;
+  --text-display: 2.5rem;
+  --text-display--line-height: 1.2;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
 }
 
 * {
@@ -24,13 +53,8 @@ body {
   margin: 0;
   background: var(--color-surface);
   color: var(--color-text);
-  font-family:
-    Inter,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
 }
 
 button,
@@ -40,7 +64,27 @@ select {
   font: inherit;
 }
 
+:focus {
+  outline: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-primary-bright);
+  outline-offset: 3px;
+}
+
 ::selection {
   background: var(--color-primary);
   color: var(--color-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
