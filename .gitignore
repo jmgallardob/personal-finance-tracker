@@ -145,3 +145,12 @@ vite.config.ts.timestamp-*
 
 # Local file drops
 .orca/
+
+# Local SQLite files
+/data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
