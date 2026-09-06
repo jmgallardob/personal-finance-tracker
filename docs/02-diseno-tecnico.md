@@ -1,6 +1,6 @@
 # Diseño técnico
 
-**Estado:** aceptado v1.5 para el MVP
+**Estado:** aceptado v1.8 para el MVP
 
 **Enfoque:** monolito modular privado, desplegable como una única aplicación.
 
@@ -63,25 +63,64 @@ Esto no implica construir UI multiusuario ni permisos durante el MVP.
 - `TransactionTag`: relación muchos-a-muchos entre movimiento y etiqueta.
 - `RecurringRule`: plantilla mensual, día objetivo, próxima fecha, estado y fecha
   de desactivación.
+- `RecurringOccurrence`: constancia de que una regla ya procesó una fecha de
+  vencimiento. Guarda la regla, la fecha programada y un enlace anulable al
+  movimiento creado; no guarda importe ni ningún otro dato personal. Es una
+  ampliación del esquema introducida al aceptar estas reglas, no una tabla que
+  el diseño ya recogiese.
 
 No existen tablas `Account`, `Balance`, `Transfer`, `Budget` ni `ImportBatch` en
 el esquema inicial.
 
 ### Invariantes
 
-- `amount_minor INTEGER > 0` —entero de 64 bits de SQLite— y moneda fija
-  `EUR`.
+- `amount_minor INTEGER` entre `1` y `99999999999` —entero de 64 bits de
+  SQLite— y moneda fija `EUR`.
 - `type` solo admite `income` o `expense`.
 - La categoría pertenece al mismo workspace y coincide con el tipo.
 - Un movimiento no puede repetir una etiqueta.
 - Fecha efectiva como texto ISO `YYYY-MM-DD`; marcas técnicas como enteros Unix
   en milisegundos UTC.
 - Los nombres normalizados de categorías y tags activos son únicos dentro de su
-  ámbito y workspace.
+  ámbito y workspace: por tipo en categorías y global en tags.
+- El nombre normalizado se guarda aparte del nombre de presentación y se obtiene
+  recortando, aplicando Unicode NFC, colapsando espacios internos y pasando a
+  minúsculas sin eliminar diacríticos.
+- `category.type` es inmutable: ninguna mutación del MVP lo modifica.
+- Longitudes máximas: concepto 200 caracteres, nota 2.000, nombre de categoría
+  o tag 80, y como mucho 20 filas de `TransactionTag` por movimiento.
 - El archivado conserva asociaciones históricas.
 - Cada mutación y sus asociaciones se confirman en una transacción SQL.
 - Cada movimiento automático guarda `recurring_rule_id` y `scheduled_for`; una
   restricción única sobre ambos campos impide duplicar un vencimiento.
+- `RecurringOccurrence` es único por `(recurring_rule_id, scheduled_for)` y
+  sobrevive al borrado de su movimiento: en ese caso su enlace queda nulo y la
+  fecha no vuelve a generarse.
+- Un movimiento de origen tiene como mucho una `RecurringRule` activa.
+- Una regla desactivada no vuelve al estado activo; el MVP no expone reactivar
+  ni borrar reglas.
+- No se puede archivar una categoría o un tag referenciado por la plantilla de
+  una regla activa.
+
+## Contrato de validación de importes y texto
+
+La conversión de importes vive en el dominio y no usa `parseFloat` ni
+redondeo implícito. Acepta el texto que cumpla
+`^\d{1,3}(\.\d{3})*(,\d{1,2})?$` o `^\d+(,\d{1,2})?$` tras recortar los
+extremos, y rechaza cualquier otra forma —punto decimal, grupos de millar
+incompletos, más de dos decimales, signo, símbolo de moneda o espacios internos—
+con un error de campo. El resultado es un entero de céntimos dentro de
+`[1, 99999999999]`.
+
+Las agregaciones acumulan céntimos como enteros y verifican el rango seguro
+antes de serializar un total en JSON. Cuando la suma exacta supera
+`Number.MAX_SAFE_INTEGER` la consulta devuelve un error controlado en lugar de
+un número impreciso; ninguna capa convierte céntimos a coma flotante para sumar.
+
+La normalización de nombres se aplica en el dominio antes de comprobar la
+unicidad y antes de escribir. Concepto y nota conservan sus tildes. Los
+caracteres de control no imprimibles se rechazan en concepto, nota y nombres; la
+nota es el único campo que admite saltos de línea.
 
 ## Capas
 
@@ -106,6 +145,9 @@ Presentación → Aplicación → Dominio
 - La búsqueda cubre concepto y nota, con escape y normalización apropiados.
 - Los filtros combinan `dateFrom`, `dateTo`, tipo, categoría, texto y tags.
 - Al seleccionar varios tags se aplica semántica OR.
+- `untagged=true` selecciona los movimientos sin ninguna etiqueta y es
+  mutuamente excluyente con el filtro por etiqueta: recibir ambos es un error de
+  validación, no una intersección vacía.
 
 `dateFrom` y `dateTo` son fechas ISO sin hora en el contrato, se aplican de
 forma inclusiva y son opcionales independientemente. Se validan en el servidor y
@@ -134,6 +176,12 @@ multiplicar accidentalmente ingresos/gastos generales. En la agregación por tag
 el importe completo se atribuye a cada tag asociado. La API indicará que los
 grupos se solapan y que su suma no representa el gasto total.
 
+El gasto sin etiquetas se calcula como un grupo aparte de la agregación por tag,
+sin crear ninguna fila artificial en `Tag`. Los desgloses por categoría y por
+tag incluyen los elementos archivados que tengan importe en la ventana y los
+marcan como archivados; la selección de la UI decide qué se dibuja, nunca qué
+se suma.
+
 La consulta de medias determina en `Europe/Madrid` el último mes natural cerrado
 y toma hasta 12 meses, comenzando como pronto en el primer mes natural completo
 posterior al primer movimiento. Genera explícitamente la serie de meses para
@@ -141,15 +189,31 @@ incluir meses sin datos con valor cero. Si la ventana está vacía devuelve
 `insufficientHistory`, no importes cero. La respuesta incluye `windowStart`,
 `windowEnd` y `monthCount` para que la UI pueda explicar el cálculo.
 
+Cada media viaja como suma exacta en céntimos y divisor de meses, no como una
+cifra ya redondeada. El redondeo al céntimo más próximo, con la mitad alejándose
+de cero también en negativos, ocurre solo al presentar. Ningún total se obtiene
+sumando medias redondeadas.
+
 La serie de evolución es independiente del selector principal y comprende el mes
-actual más hasta 11 meses anteriores. Para el mes actual, la comparación usa los
-mismos días del mes anterior; los demás presets emplean los periodos completos o
-intervalos equivalentes definidos funcionalmente.
+actual más hasta 11 meses anteriores, con los meses sin datos materializados a
+cero; cuando no existe ningún movimiento, la serie se devuelve vacía en lugar de
+una sucesión de ceros.
+
+La comparación con el periodo anterior recorre ambos intervalos hasta el mismo
+día ordinal y limita el extremo del intervalo anterior al último día de su mes
+cuando ese día no existe. La respuesta incluye los cuatro extremos realmente
+comparados para que la UI pueda rotularlos. El cambio porcentual es
+`(actual − anterior) ÷ abs(anterior)`; con `anterior = 0` y `actual ≠ 0`
+devuelve `null` junto a un motivo que la UI traduce como “Sin base de
+comparación”, y con ambos valores a cero devuelve `0`.
 
 Las selecciones de categorías y tags se aplican sobre las series de desglose ya
 devueltas o mediante parámetros específicos de visualización. Un estado por
 dimensión se comparte entre su distribución del periodo y su media mensual. No se
-reutiliza como filtro de la consulta de totales. Esta separación evita que una
+reutiliza como filtro de la consulta de totales. La selección inicial contiene
+los elementos activos; los archivados llegan marcados y sin seleccionar, y un
+elemento activo nuevo entra en la selección mientras el usuario no haya
+interactuado manualmente con ese selector. Esta separación evita que una
 selección parcial cambie accidentalmente ingresos, gastos, balance o medias
 globales. El estado se conserva durante la sesión y no requiere persistencia en
 base de datos en el MVP.
@@ -166,8 +230,27 @@ base de datos en el MVP.
 
 ### Duplicar
 
-Duplicar no persiste inmediatamente. Devuelve o abre un formulario precargado,
-con identificador nuevo solo después de que el usuario confirme.
+Duplicar no persiste inmediatamente. Devuelve o abre un formulario precargado
+con tipo, importe, categoría, concepto, nota, tags y la fecha del movimiento de
+origen, con identificador nuevo solo después de que el usuario confirme. La
+copia no arrastra la recurrencia: `recurring_rule_id` y `scheduled_for` quedan
+nulos aunque el origen fuese una entrada generada.
+
+### Clasificación archivada al editar
+
+La validación de una mutación compara la clasificación entrante con la que el
+movimiento ya tenía:
+
+- una categoría o un tag archivados se aceptan solo si ya estaban asociados a
+  ese movimiento antes de la edición;
+- cualquier otra categoría o tag archivados se rechazan, igual que en un alta;
+- quitar un tag archivado es válido, pero volver a añadirlo ya no lo es;
+- si la mutación cambia `type`, exige una categoría activa compatible con el
+  nuevo tipo; conservar la categoría anterior deja de ser posible.
+
+La reordenación recibe la lista completa de identificadores de categorías
+activas de un solo tipo, sin duplicados ni identificadores ajenos. Las
+categorías archivadas no participan en la ordenación.
 
 ### Eliminar
 
@@ -180,7 +263,8 @@ claramente la transacción afectada.
 1. Una tarea programada obtiene reglas activas con `next_due_date <= hoy`, usando
    la fecha actual de `Europe/Madrid`.
 2. Por cada vencimiento pendiente abre una transacción SQL y crea el movimiento
-   con una copia de la plantilla y de sus tags.
+   con una copia de la plantilla y de sus tags, junto con su
+   `RecurringOccurrence`.
 3. La restricción `(recurring_rule_id, scheduled_for)` hace idempotente cualquier
    reintento o ejecución concurrente.
 4. Calcula el próximo mes utilizando el día objetivo o su último día disponible.
@@ -188,7 +272,49 @@ claramente la transacción afectada.
 
 La tarea se ejecuta al menos diariamente y también al arrancar la aplicación. El
 dashboard solo consulta movimientos materializados; una regla nunca cuenta como
-gasto o ingreso previsto.
+gasto o ingreso previsto. La tarea recorre únicamente el conjunto de datos
+personales.
+
+Borrar un movimiento generado elimina el movimiento y sus asociaciones, pero
+conserva su `RecurringOccurrence` con el enlace a nulo, de modo que esa fecha
+queda procesada para siempre. Borrar el movimiento de origen no toca la regla.
+
+### Editar o desactivar una regla
+
+1. Abrir una transacción SQL y tomar la regla para escritura, de forma que el
+   generador no pueda intercalarse.
+2. Revalidar dentro de esa transacción los vencimientos pendientes hasta hoy y
+   la versión de la plantilla leída por la interfaz; si no coinciden, abortar y
+   pedir reintento.
+3. Materializar esos vencimientos pendientes con la plantilla anterior.
+4. Aplicar la edición o la desactivación y recalcular `next_due_date` como una
+   fecha estrictamente futura.
+5. Confirmar. Cualquier fallo deja la regla y sus vencimientos como estaban; el
+   reintento es idempotente porque la unicidad de
+   `(recurring_rule_id, scheduled_for)` impide repetir una fecha.
+
+El punto de corte es ese bloqueo serializado: la recuperación de atrasados y el
+cambio de plantilla ocurren en la misma transacción, nunca en dos pasos que el
+generador pueda partir por la mitad.
+
+## Aislamiento de la demostración
+
+- La demostración usa un archivo SQLite propio con el mismo esquema y las mismas
+  migraciones que el archivo personal; no hay tablas ni columnas de modo.
+- Una cookie de sesión decide qué archivo abre cada petición. Su contenido es un
+  valor de modo acotado, `personal` o `demo`, validado en el servidor contra ese
+  conjunto cerrado; cualquier otro contenido no es un modo válido.
+- El servidor resuelve ese modo contra dos rutas de base de datos fijas de su
+  configuración. La cookie nunca transporta, compone ni elige una ruta de
+  archivo ni un identificador de espacio de trabajo, de modo que no existe
+  entrada del cliente que pueda dirigir la aplicación a otro archivo.
+- Salir de la demostración vuelve al archivo personal existente sin copiar ni
+  borrar datos.
+- El reinicio actúa exclusivamente sobre el archivo de demostración, exige
+  confirmación explícita y se coordina con las escrituras en curso para no
+  truncar una transacción.
+- La tarea de recurrencias de los datos personales no abre el archivo de
+  demostración.
 
 ## Seguridad y privacidad
 
