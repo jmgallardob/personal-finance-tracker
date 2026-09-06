@@ -267,6 +267,37 @@ describe("formatMoneyMinorAsEur", () => {
     );
   });
 
+  it.each([
+    [Number.MAX_SAFE_INTEGER, "90.071.992.547.409,91 €"],
+    [Number.MAX_SAFE_INTEGER - 1, "90.071.992.547.409,90 €"],
+    [-Number.MAX_SAFE_INTEGER, "-90.071.992.547.409,91 €"],
+    [-(Number.MAX_SAFE_INTEGER - 1), "-90.071.992.547.409,90 €"],
+    [-1, "-0,01 €"],
+    [-100, "-1,00 €"],
+  ])(
+    "formats the exact cents of %i at the safe-integer boundary",
+    (minor, expected) => {
+      expect(withPlainSpaces(formatMoneyMinorAsEur(checkedMinor(minor)))).toBe(
+        expected,
+      );
+    },
+  );
+
+  it("distinguishes adjacent amounts at both safe-integer boundaries", () => {
+    const positives = [
+      Number.MAX_SAFE_INTEGER,
+      Number.MAX_SAFE_INTEGER - 1,
+      Number.MAX_SAFE_INTEGER - 2,
+    ].map((minor) => formatMoneyMinorAsEur(checkedMinor(minor)));
+    const negatives = positives.map((_, index) =>
+      formatMoneyMinorAsEur(checkedMinor(-(Number.MAX_SAFE_INTEGER - index))),
+    );
+
+    expect(new Set(positives).size).toBe(3);
+    expect(new Set(negatives).size).toBe(3);
+    expect(new Set([...positives, ...negatives]).size).toBe(6);
+  });
+
   it("formats the accepted maximum without losing a cent", () => {
     expect(
       withPlainSpaces(formatMoneyMinorAsEur(parsedMinor("999.999.999,99"))),
@@ -285,6 +316,36 @@ describe("formatMoneyMinorAsAmountText", () => {
     expect(
       withPlainSpaces(formatMoneyMinorAsAmountText(checkedMinor(minor))),
     ).toBe(expected);
+  });
+
+  it.each([
+    [Number.MAX_SAFE_INTEGER, "90.071.992.547.409,91"],
+    [Number.MAX_SAFE_INTEGER - 1, "90.071.992.547.409,90"],
+    [9007199254740901, "90.071.992.547.409,01"],
+    [-Number.MAX_SAFE_INTEGER, "-90.071.992.547.409,91"],
+    [-1, "-0,01"],
+    [-10, "-0,10"],
+  ])(
+    "formats the exact cents of %i at the safe-integer boundary",
+    (minor, expected) => {
+      expect(
+        withPlainSpaces(formatMoneyMinorAsAmountText(checkedMinor(minor))),
+      ).toBe(expected);
+    },
+  );
+
+  it("keeps the exact cents that a major-unit division would round away", () => {
+    expect(
+      formatMoneyMinorAsAmountText(checkedMinor(Number.MAX_SAFE_INTEGER)),
+    ).not.toBe(
+      formatMoneyMinorAsAmountText(checkedMinor(Number.MAX_SAFE_INTEGER - 1)),
+    );
+    expect(
+      formatMoneyMinorAsAmountText(checkedMinor(Number.MAX_SAFE_INTEGER)),
+    ).toMatch(/,91$/);
+    expect(
+      formatMoneyMinorAsAmountText(checkedMinor(Number.MAX_SAFE_INTEGER - 1)),
+    ).toMatch(/,90$/);
   });
 
   it.each([1, 10, 999, 1250, 123456, 12345678, 99999999999])(

@@ -125,14 +125,29 @@ export function subtractMoneyMinor(
 }
 
 /**
- * Converts minor units into the major-unit number used only for presentation.
+ * Formats an exact amount of minor units with a locale-aware formatter.
  *
- * The quotient of an exact safe integer by 100 stays far from any half-cent
- * boundary, so formatting it with two fraction digits reproduces the exact
- * amount. No calculation uses this value.
+ * The amount is split into whole units and cents from its digits, so no
+ * floating-point division ever touches the value: only the whole units, always
+ * an exact safe integer, reach `Intl`. The formatter renders them with two
+ * fraction digits and the exact cents replace that fraction, which keeps the
+ * locale grouping, decimal separator, sign and currency placement intact for
+ * every representable amount.
  */
-function toMajorUnits(minor: MoneyMinor): number {
-  return minor / 100;
+function formatExactMinor(
+  formatter: Intl.NumberFormat,
+  minor: MoneyMinor,
+): string {
+  const digits = Math.abs(minor).toString().padStart(3, "0");
+  const unitDigits = digits.slice(0, -2);
+  const centDigits = digits.slice(-2);
+  const units = Number(unitDigits);
+  const signedUnits = minor < 0 ? -units : units;
+
+  return formatter
+    .formatToParts(signedUnits)
+    .map((part) => (part.type === "fraction" ? centDigits : part.value))
+    .join("");
 }
 
 const eurFormatter = new Intl.NumberFormat("es-ES", {
@@ -149,7 +164,7 @@ const amountTextFormatter = new Intl.NumberFormat("es-ES", {
 
 /** Formats an amount as Spanish EUR currency copy, for example `1.234,56 €`. */
 export function formatMoneyMinorAsEur(minor: MoneyMinor): string {
-  return eurFormatter.format(toMajorUnits(minor));
+  return formatExactMinor(eurFormatter, minor);
 }
 
 /**
@@ -157,5 +172,5 @@ export function formatMoneyMinorAsEur(minor: MoneyMinor): string {
  * same shape accepted by {@link parseTransactionAmountText}.
  */
 export function formatMoneyMinorAsAmountText(minor: MoneyMinor): string {
-  return amountTextFormatter.format(toMajorUnits(minor));
+  return formatExactMinor(amountTextFormatter, minor);
 }
