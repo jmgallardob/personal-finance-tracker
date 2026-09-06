@@ -76,6 +76,26 @@ describe("createTag", () => {
     ]);
   });
 
+  it("counts the visible characters of a decomposed accent at the boundary", () => {
+    expect(
+      created({ name: "cafe\u0301".repeat(MAX_TAG_NAME_LENGTH / 4) }).name,
+    ).toHaveLength(MAX_TAG_NAME_LENGTH);
+    expect(
+      errorsOf({ name: "cafe\u0301".repeat(MAX_TAG_NAME_LENGTH / 4 + 1) }),
+    ).toEqual([{ field: "name", code: "tooLong" }]);
+  });
+
+  it("counts a flag as a single visible character at the boundary", () => {
+    const flag = "\u{1F1EA}\u{1F1F8}";
+
+    expect(created({ name: flag.repeat(MAX_TAG_NAME_LENGTH) }).name).toBe(
+      flag.repeat(MAX_TAG_NAME_LENGTH),
+    );
+    expect(errorsOf({ name: flag.repeat(MAX_TAG_NAME_LENGTH + 1) })).toEqual([
+      { field: "name", code: "tooLong" },
+    ]);
+  });
+
   it.each(["", "   "])("rejects the empty name %p", (name) => {
     expect(errorsOf({ name })).toEqual([{ field: "name", code: "required" }]);
   });

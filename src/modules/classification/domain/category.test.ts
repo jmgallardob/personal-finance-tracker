@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { characterLength } from "../../../shared/domain/text";
+
 import type { Category, CategoryInput } from "./category";
 import {
   MAX_CATEGORY_NAME_LENGTH,
@@ -87,6 +89,36 @@ describe("createCategory", () => {
       errorsOf({ name: "\u{1F381}".repeat(MAX_CATEGORY_NAME_LENGTH + 1) }),
     ).toEqual([{ field: "name", code: "tooLong" }]);
   });
+
+  it.each([
+    ["café", "an accented letter written composed"],
+    ["cafe\u0301", "an accented letter written decomposed"],
+    ["x\u0301", "a combining mark with no composed form"],
+    ["\u{1F44D}\u{1F3FD}", "a skin-tone emoji"],
+    ["\u{1F1EA}\u{1F1F8}", "a flag"],
+    [
+      "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}",
+      "a family sequence",
+    ],
+  ])(
+    "counts %p as visible characters at the boundary, where each one is %s",
+    (character) => {
+      const visibleCharacters = [
+        ...new Intl.Segmenter("es", { granularity: "grapheme" }).segment(
+          character,
+        ),
+      ].length;
+      const repetitions = MAX_CATEGORY_NAME_LENGTH / visibleCharacters;
+
+      expect(Number.isInteger(repetitions)).toBe(true);
+      expect(
+        characterLength(created({ name: character.repeat(repetitions) }).name),
+      ).toBe(MAX_CATEGORY_NAME_LENGTH);
+      expect(errorsOf({ name: character.repeat(repetitions + 1) })).toEqual([
+        { field: "name", code: "tooLong" },
+      ]);
+    },
+  );
 
   it.each(["", "   "])("rejects the empty name %p", (name) => {
     expect(errorsOf({ name })).toEqual([{ field: "name", code: "required" }]);

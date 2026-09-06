@@ -222,6 +222,41 @@ describe("createTransaction text boundaries", () => {
     expect(created({ concept }).concept).toBe(concept);
   });
 
+  it.each([
+    ["cafe\u0301", "an accented letter written decomposed"],
+    ["\u{1F1EA}\u{1F1F8}", "a flag"],
+    [
+      "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}",
+      "a family sequence",
+    ],
+  ])(
+    "counts the visible characters of a concept made of %p, each one %s",
+    (character) => {
+      const visibleCharacters = [
+        ...new Intl.Segmenter("es", { granularity: "grapheme" }).segment(
+          character,
+        ),
+      ].length;
+      const repetitions = MAX_CONCEPT_LENGTH / visibleCharacters;
+
+      expect(
+        created({ concept: character.repeat(repetitions) }).concept,
+      ).not.toBeNull();
+      expect(errorsOf({ concept: character.repeat(repetitions + 1) })).toEqual([
+        { field: "concept", code: "tooLong" },
+      ]);
+    },
+  );
+
+  it("counts the visible characters of a note at its boundary", () => {
+    const flag = "\u{1F1EA}\u{1F1F8}";
+
+    expect(created({ note: flag.repeat(MAX_NOTE_LENGTH) }).note).not.toBeNull();
+    expect(errorsOf({ note: flag.repeat(MAX_NOTE_LENGTH + 1) })).toEqual([
+      { field: "note", code: "tooLong" },
+    ]);
+  });
+
   it("rejects line breaks in the concept and accepts them in the note", () => {
     expect(errorsOf({ concept: "Primera\nSegunda" })).toEqual([
       { field: "concept", code: "invalidCharacter" },

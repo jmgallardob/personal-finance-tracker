@@ -121,6 +121,39 @@ describe("characterLength", () => {
     expect("\u{1F381}".length).toBe(2);
     expect(characterLength("")).toBe(0);
   });
+
+  it("counts an accented letter as one character, composed or decomposed", () => {
+    expect(characterLength(DECOMPOSED_CAFE)).toBe(4);
+    expect(characterLength("café")).toBe(4);
+    expect([...DECOMPOSED_CAFE].length).toBe(5);
+  });
+
+  it("counts a combining mark with no composed form as one character", () => {
+    const decomposedOnly = "x\u0301";
+
+    expect(characterLength(decomposedOnly)).toBe(1);
+    expect([...decomposedOnly.normalize("NFC")].length).toBe(2);
+  });
+
+  it.each([
+    ["\u{1F44D}\u{1F3FD}", 2, "a skin-tone emoji"],
+    ["\u{1F1EA}\u{1F1F8}", 2, "a flag"],
+    [
+      "\u{1F468}\u200D\u{1F469}\u200D\u{1F467}\u200D\u{1F466}",
+      7,
+      "a family sequence",
+    ],
+  ])(
+    "counts %p as one character even though %i code points build %s",
+    (text, codePoints) => {
+      expect(characterLength(text)).toBe(1);
+      expect([...text].length).toBe(codePoints);
+    },
+  );
+
+  it("counts a sequence of visible characters one by one", () => {
+    expect(characterLength("Cañón \u{1F1EA}\u{1F1F8}")).toBe(7);
+  });
 });
 
 describe("containsControlCharacters", () => {

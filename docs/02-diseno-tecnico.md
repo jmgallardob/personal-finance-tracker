@@ -88,7 +88,9 @@ el esquema inicial.
   minúsculas sin eliminar diacríticos.
 - `category.type` es inmutable: ninguna mutación del MVP lo modifica.
 - Longitudes máximas: concepto 200 caracteres, nota 2.000, nombre de categoría
-  o tag 80, y como mucho 20 filas de `TransactionTag` por movimiento.
+  o tag 80, y como mucho 20 filas de `TransactionTag` por movimiento. La unidad
+  de esos límites es el carácter visible —el grupo de grafemas— y no el punto de
+  código ni la unidad UTF-16.
 - El archivado conserva asociaciones históricas.
 - Cada mutación y sus asociaciones se confirman en una transacción SQL.
 - Cada movimiento automático guarda `recurring_rule_id` y `scheduled_for`; una
@@ -120,7 +122,14 @@ un número impreciso; ninguna capa convierte céntimos a coma flotante para suma
 La normalización de nombres se aplica en el dominio antes de comprobar la
 unicidad y antes de escribir. Concepto y nota conservan sus tildes. Los
 caracteres de control no imprimibles se rechazan en concepto, nota y nombres; la
-nota es el único campo que admite saltos de línea.
+nota es el único campo que admite saltos de línea. Esa validación se aplica
+sobre el texto recibido, antes de recortar los extremos o colapsar espacios, de
+modo que un control situado en un extremo se rechaza en lugar de desaparecer.
+
+Las longitudes máximas se miden en caracteres visibles, segmentando el texto en
+grupos de grafemas con `Intl.Segmenter`. Una letra acentuada cuenta uno en su
+forma compuesta y en la descompuesta, y una secuencia de emoji con tono de piel,
+una bandera o un grupo familiar unido con `ZWJ` cuentan uno.
 
 ## Capas
 

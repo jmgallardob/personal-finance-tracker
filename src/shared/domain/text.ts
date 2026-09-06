@@ -12,11 +12,17 @@
  * a line break at an extreme: a forbidden character stays in the text so the
  * validation that follows rejects it instead of silently erasing it. Only the
  * note trims the line breaks it is allowed to contain.
+ *
+ * The accepted length limits count user-perceived characters, that is grapheme
+ * clusters, not code points and not UTF-16 units.
  */
 
 const CONTROL_CHARACTERS = /[\p{Cc}]/u;
 const CONTROL_CHARACTERS_EXCEPT_LINE_BREAKS = /[^\P{Cc}\n\r]/u;
 const IDENTIFIER_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Segments text into the visible characters the accepted limits count. */
+const graphemeSegmenter = new Intl.Segmenter("es", { granularity: "grapheme" });
 
 /** Whitespace that is not a control character, the only whitespace collapsed. */
 const PRINTABLE_WHITESPACE_RUN = /[^\S\p{Cc}]+/gu;
@@ -76,11 +82,14 @@ export function normalizeFreeText(
 }
 
 /**
- * Length in Unicode code points, so an accented letter or an emoji counts as
- * the single character a person sees.
+ * Length in user-perceived characters, the approved unit of the accepted
+ * limits. It segments the text into grapheme clusters, so an accented letter
+ * counts as one whether it is written composed or decomposed, and an emoji
+ * counts as one even when it carries a skin tone, is a flag or is a family
+ * sequence joined with zero-width joiners.
  */
 export function characterLength(text: string): number {
-  return [...text].length;
+  return [...graphemeSegmenter.segment(text)].length;
 }
 
 /** Tells whether the text contains non-printable control characters. */
