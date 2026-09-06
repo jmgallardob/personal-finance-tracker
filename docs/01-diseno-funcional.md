@@ -186,6 +186,10 @@ una cifra aproximada.
 - Se rechazan los caracteres de control no imprimibles en todos estos campos. La
   única excepción son los saltos de línea de la nota.
 - Un nombre que quede vacío tras normalizar se rechaza como campo obligatorio.
+- Los límites de longitud cuentan caracteres visibles, tal como los percibe la
+  persona que escribe. Una letra acentuada cuenta uno tanto si se teclea
+  compuesta como descompuesta, y un emoji cuenta uno aunque lleve tono de piel o
+  esté formado por varios símbolos, como una bandera o un grupo familiar.
 
 ### Duplicar un movimiento
 
@@ -467,7 +471,8 @@ El aislamiento es de almacenamiento, no solo de presentación:
     desbordamiento antes de publicar un total; un agregado no representable
     devuelve un error controlado en lugar de una cifra redondeada.
 19. Concepto admite 200 caracteres, la nota 2.000, los nombres de categoría y
-    etiqueta 80, y un movimiento admite como máximo 20 etiquetas.
+    etiqueta 80, y un movimiento admite como máximo 20 etiquetas. Esos límites
+    cuentan caracteres visibles, no unidades internas de codificación.
 20. Los nombres de categoría y etiqueta se guardan recortados, en Unicode NFC y
     con los espacios internos colapsados; su unicidad se compara en minúsculas
     conservando las tildes. Los campos de texto rechazan controles no
