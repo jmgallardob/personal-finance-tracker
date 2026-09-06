@@ -80,10 +80,24 @@ describe("createTag", () => {
     expect(errorsOf({ name })).toEqual([{ field: "name", code: "required" }]);
   });
 
-  it("rejects a name with non-printable control characters", () => {
-    expect(errorsOf({ name: "viaje\u001F" })).toEqual([
+  it.each([
+    ["viaje\u001F", "a control character at the end"],
+    ["\u001Fviaje", "a control character at the start"],
+    ["via\u0000je", "a control character in the middle"],
+    ["\tviaje", "a leading tab"],
+    ["viaje\t", "a trailing tab"],
+    ["via\tje", "an internal tab"],
+    ["\nviaje", "a leading line break"],
+    ["viaje\n", "a trailing line break"],
+    ["via\rje", "an internal carriage return"],
+  ])("rejects the name %p because of %s", (name) => {
+    expect(errorsOf({ name })).toEqual([
       { field: "name", code: "invalidCharacter" },
     ]);
+  });
+
+  it("still normalizes the printable whitespace of an accepted name", () => {
+    expect(created({ name: "  con   amigos  " }).name).toBe("con amigos");
   });
 
   it.each(["", "with space", "acentúa"])(

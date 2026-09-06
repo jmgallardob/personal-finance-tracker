@@ -229,13 +229,54 @@ describe("createTransaction text boundaries", () => {
     expect(created({ note: "Primera\nSegunda" }).note).toBe("Primera\nSegunda");
   });
 
-  it("rejects non-printable control characters in the concept and in the note", () => {
-    expect(errorsOf({ concept: "Compra\u0000" })).toEqual([
+  it.each([
+    ["Compra\u0000", "a control character at the end"],
+    ["\u0007Compra", "a control character at the start"],
+    ["Com\u001Fpra", "a control character in the middle"],
+    ["\tCompra", "a leading tab"],
+    ["Compra\t", "a trailing tab"],
+    ["Com\tpra", "an internal tab"],
+    ["\nCompra", "a leading line break"],
+    ["Compra\n", "a trailing line break"],
+    ["\r\nCompra\r\n", "line breaks at both extremes"],
+  ])("rejects the concept %p because of %s", (concept) => {
+    expect(errorsOf({ concept })).toEqual([
       { field: "concept", code: "invalidCharacter" },
     ]);
-    expect(errorsOf({ note: "Nota\u0007" })).toEqual([
+  });
+
+  it.each([
+    ["Nota\u0007", "a control character at the end"],
+    ["\u0000Nota", "a control character at the start"],
+    ["No\u001Fta", "a control character in the middle"],
+    ["\tNota", "a leading tab"],
+    ["Nota\t", "a trailing tab"],
+    ["No\tta", "an internal tab"],
+  ])("rejects the note %p because of %s", (note) => {
+    expect(errorsOf({ note })).toEqual([
       { field: "note", code: "invalidCharacter" },
     ]);
+  });
+
+  it.each([
+    ["\nNota", "Nota"],
+    ["Nota\n", "Nota"],
+    ["\r\n  Primera\nSegunda  \r\n", "Primera\nSegunda"],
+  ])(
+    "accepts the note %p and trims its permitted line breaks",
+    (note, expected) => {
+      expect(created({ note }).note).toBe(expected);
+    },
+  );
+
+  it("stores a note made only of line breaks as no note at all", () => {
+    expect(created({ note: "\n\r\n" }).note).toBeNull();
+  });
+
+  it("still trims the printable extremes of an accepted concept", () => {
+    expect(created({ concept: "   Compra semanal   " }).concept).toBe(
+      "Compra semanal",
+    );
   });
 });
 

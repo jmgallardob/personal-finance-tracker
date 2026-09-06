@@ -20,7 +20,6 @@ describe("normalizeName", () => {
   it.each([
     ["  Vacaciones  ", "Vacaciones"],
     ["con   amigos", "con amigos"],
-    ["con\tamigos", "con amigos"],
     ["  Comida a  domicilio ", "Comida a domicilio"],
     ["Café", "Café"],
     ["   ", ""],
@@ -33,6 +32,18 @@ describe("normalizeName", () => {
     expect(DECOMPOSED_CAFE).not.toBe("café");
     expect(normalizeName(DECOMPOSED_CAFE)).toBe("café");
     expect(characterLength(normalizeName(DECOMPOSED_CAFE))).toBe(4);
+  });
+
+  it.each(["\tCasa", "Ca\tsa", "Casa\t", "\nCasa", "Casa\r", "Casa\u0000"])(
+    "keeps the control characters of %p instead of collapsing or trimming them",
+    (raw) => {
+      expect(normalizeName(raw)).toBe(raw.normalize("NFC"));
+      expect(containsControlCharacters(normalizeName(raw), false)).toBe(true);
+    },
+  );
+
+  it("collapses only the printable whitespace around a control character", () => {
+    expect(normalizeName("  Casa   de\tcampo  ")).toBe("Casa de\tcampo");
   });
 
   it("keeps the case the owner typed", () => {
@@ -61,14 +72,45 @@ describe("nameKey and areNamesEquivalent", () => {
 });
 
 describe("normalizeFreeText", () => {
-  it("trims the extremes and keeps accents and internal spacing", () => {
-    expect(normalizeFreeText("  Cena con  Ana  ")).toBe("Cena con  Ana");
-    expect(normalizeFreeText(DECOMPOSED_CAFE)).toBe("café");
-    expect(normalizeFreeText("   ")).toBe("");
-  });
+  it.each([true, false])(
+    "trims the printable extremes and keeps accents and internal spacing (line breaks allowed: %s)",
+    (allowLineBreaks) => {
+      expect(normalizeFreeText("  Cena con  Ana  ", allowLineBreaks)).toBe(
+        "Cena con  Ana",
+      );
+      expect(normalizeFreeText(DECOMPOSED_CAFE, allowLineBreaks)).toBe("café");
+      expect(normalizeFreeText("   ", allowLineBreaks)).toBe("");
+    },
+  );
 
   it("keeps the line breaks a note may contain", () => {
-    expect(normalizeFreeText("primera\nsegunda")).toBe("primera\nsegunda");
+    expect(normalizeFreeText("primera\nsegunda", true)).toBe(
+      "primera\nsegunda",
+    );
+  });
+
+  it("trims the line breaks a note may contain only at its extremes", () => {
+    expect(normalizeFreeText("\n\n  Nota  \r\n", true)).toBe("Nota");
+    expect(normalizeFreeText("\n\n", true)).toBe("");
+  });
+
+  it("keeps the line breaks of a text that does not accept them, so they are rejected", () => {
+    expect(normalizeFreeText("\nConcepto\n", false)).toBe("\nConcepto\n");
+    expect(normalizeFreeText("\n", false)).toBe("\n");
+  });
+
+  it.each(CONTROL_SAMPLES)(
+    "keeps the forbidden control characters of %p wherever they appear",
+    (text) => {
+      expect(normalizeFreeText(text, true)).toBe(text);
+      expect(normalizeFreeText(text, false)).toBe(text);
+    },
+  );
+
+  it("keeps a forbidden control character at a trimmed extreme", () => {
+    expect(normalizeFreeText("\tNota", true)).toBe("\tNota");
+    expect(normalizeFreeText("Nota\u0000", true)).toBe("Nota\u0000");
+    expect(normalizeFreeText("  \u0007  ", true)).toBe("\u0007");
   });
 });
 

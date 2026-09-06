@@ -88,14 +88,38 @@ describe("createCategory", () => {
     ).toEqual([{ field: "name", code: "tooLong" }]);
   });
 
-  it.each(["", "   ", "\t\n "])("rejects the empty name %p", (name) => {
+  it.each(["", "   "])("rejects the empty name %p", (name) => {
     expect(errorsOf({ name })).toEqual([{ field: "name", code: "required" }]);
   });
 
-  it("rejects a name with non-printable control characters", () => {
-    expect(errorsOf({ name: "Casa\u0007" })).toEqual([
+  it("rejects a name made of control characters as an invalid character, not as an empty name", () => {
+    expect(errorsOf({ name: "\t\n " })).toEqual([
       { field: "name", code: "invalidCharacter" },
     ]);
+  });
+
+  it.each([
+    ["Casa\u0007", "a control character in the middle"],
+    ["\u0007Casa", "a control character at the start"],
+    ["Casa\u0000", "a control character at the end"],
+    ["\tCasa", "a leading tab"],
+    ["Casa\t", "a trailing tab"],
+    ["Ca\tsa", "an internal tab"],
+    ["\nCasa", "a leading line break"],
+    ["Casa\n", "a trailing line break"],
+    ["Ca\nsa", "an internal line break"],
+    ["Casa\r", "a trailing carriage return"],
+    ["\r\nCasa\r\n", "line breaks at both extremes"],
+  ])("rejects the name %p because of %s", (name) => {
+    expect(errorsOf({ name })).toEqual([
+      { field: "name", code: "invalidCharacter" },
+    ]);
+  });
+
+  it("still normalizes the printable whitespace of an accepted name", () => {
+    expect(created({ name: "  Comida   a  domicilio  " }).name).toBe(
+      "Comida a domicilio",
+    );
   });
 
   it.each(["gasto", "Expense", "", "transfer"])(

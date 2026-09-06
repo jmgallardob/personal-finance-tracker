@@ -96,7 +96,7 @@ function normalizeOptionalText(
     return null;
   }
 
-  const text = normalizeFreeText(raw);
+  const text = normalizeFreeText(raw, rules.allowLineBreaks);
 
   if (text === "") {
     return null;
