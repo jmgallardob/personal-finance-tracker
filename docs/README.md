@@ -9,16 +9,17 @@ una decisión explícita y la documentación debe actualizarse en el mismo cambi
 
 ## Mapa documental
 
-| Documento | Pregunta que responde | Estado |
-| --- | --- | --- |
-| [Diseño funcional](01-diseno-funcional.md) | ¿Qué problema resuelve y qué puede hacer el usuario? | Aceptado v1.6 |
-| [Diseño técnico](02-diseno-tecnico.md) | ¿Cómo se organiza el sistema y sus datos? | Aceptado v1.5 |
-| [Stack tecnológico](03-stack-tecnologico.md) | ¿Con qué tecnologías y por qué? | Aceptado v1.0 |
-| [Diseño visual y UX](04-diseno-visual-ux.md) | ¿Cómo se ve, se entiende y se utiliza? | Aceptado v1.6 |
-| [Referencia visual](design/references/revolut/README.md) | ¿Qué materiales visuales inspiran el sistema y cómo se adaptan? | Referencia local |
-| [Tests y QA](05-tests-qa.md) | ¿Cómo demostramos que funciona y es seguro cambiarlo? | Aceptado v1.8 |
-| [Plan de implementación](06-plan-implementacion.md) | ¿En qué orden lo construiremos y qué valida cada fase? | Aceptado v1.1 |
-| [Registro de decisiones](adr/README.md) | ¿Por qué se tomaron las decisiones difíciles de revertir? | Activo |
+| Documento                                                              | Pregunta que responde                                           | Estado           |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------- |
+| [Diseño funcional](01-diseno-funcional.md)                             | ¿Qué problema resuelve y qué puede hacer el usuario?            | Aceptado v1.6    |
+| [Diseño técnico](02-diseno-tecnico.md)                                 | ¿Cómo se organiza el sistema y sus datos?                       | Aceptado v1.5    |
+| [Stack tecnológico](03-stack-tecnologico.md)                           | ¿Con qué tecnologías y por qué?                                 | Aceptado v1.0    |
+| [Diseño visual y UX](04-diseno-visual-ux.md)                           | ¿Cómo se ve, se entiende y se utiliza?                          | Aceptado v1.6    |
+| [Referencia visual](design/references/revolut/README.md)               | ¿Qué materiales visuales inspiran el sistema y cómo se adaptan? | Referencia local |
+| [Tests y QA](05-tests-qa.md)                                           | ¿Cómo demostramos que funciona y es seguro cambiarlo?           | Aceptado v1.8    |
+| [Plan de implementación](06-plan-implementacion.md)                    | ¿En qué orden lo construiremos y qué valida cada fase?          | Aceptado v1.1    |
+| [Flujo de colaboración entre agentes](agent-collaboration-workflow.md) | ¿Cómo se coordinan áreas, worktrees, tareas, PR y estados?      | Activo           |
+| [Registro de decisiones](adr/README.md)                                | ¿Por qué se tomaron las decisiones difíciles de revertir?       | Activo           |
 
 ## Decisiones del MVP
 

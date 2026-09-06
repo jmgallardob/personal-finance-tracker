@@ -1,0 +1,297 @@
+# Agent collaboration workflow
+
+## Purpose
+
+This document defines how the coordinating agent and implementation agents work
+together without duplicating work, sharing branches concurrently, or publishing
+private planning documents. It applies whenever implementation is split across
+multiple agents and worktrees.
+
+The project owner remains the final authority for product decisions, pull request
+approval, and merge authorization.
+
+## Sources of truth
+
+| Information                         | Source of truth                                 | Editor                                         |
+| ----------------------------------- | ----------------------------------------------- | ---------------------------------------------- |
+| Repository policy                   | `AGENTS.md`                                     | Project owner or explicitly assigned agent     |
+| Product and technical specification | Tracked files under `docs/`                     | Agent assigned to the documentation change     |
+| Accepted implementation             | `main` and its Git history                      | Changed only through the approved Git workflow |
+| User stories                        | Private `docs/07-user-story-backlog.md`         | Coordinating agent                             |
+| Task status and evidence            | Private `docs/08-agent-implementation-tasks.md` | Coordinating agent                             |
+
+The two private paths are ignored symbolic links into the Git common directory.
+All worktrees belonging to this clone read the same underlying files. They must
+never be forced into Git, copied into a pull request, or quoted in public metadata.
+A separate clone does not receive them automatically.
+
+## Roles and authority
+
+### Project owner
+
+The project owner:
+
+- chooses product priorities and accepts or rejects unresolved product decisions;
+- decides when an area may start if prioritization is ambiguous;
+- reviews and authorizes merging pull requests;
+- may reassign the coordinator or an area owner explicitly.
+
+No agent may infer product acceptance or merge authorization from silence.
+
+### Coordinating agent
+
+The coordinating agent is the only agent allowed to edit the private user-story
+backlog and implementation task board. It:
+
+- checks task dependencies and accepted decisions against `main`;
+- marks tasks ready, assigns an area owner, and records the relevant worktree;
+- ensures that no two agents own the same branch, area, or mutable shared file;
+- receives and verifies task reports, commit identifiers, test results, coverage,
+  blockers, and pull request status;
+- updates the private task board after each verified transition;
+- coordinates review, integration, cleanup, and the next available work;
+- records product decisions only after an explicit response from the owner.
+
+The coordinator normally does not implement production tasks while coordinating
+parallel areas. A small intervention must be explicitly assigned and follow the
+same branch, commit, evidence, and review rules as any other implementation.
+
+### Implementation agent
+
+An implementation agent owns one area at a time and:
+
+- works only in the assigned worktree, branch, and task scope;
+- reads `AGENTS.md`, this workflow, the assigned task, its cited user stories,
+  and the immediate dependency contracts before changing code;
+- treats the two private planning documents as read-only;
+- implements tasks sequentially, normally producing one commit per task;
+- includes meaningful tests and documentation required by the task in that commit;
+- runs the required checks and reports exact results to the coordinator;
+- stops and reports scope conflicts, unmet dependencies, or product ambiguity;
+- does not start another task or area until it is assigned.
+
+An implementation agent must not change another agent's branch, worktree, task
+state, migration, lockfile, or shared contract without coordinator reassignment.
+
+## Unit of ownership
+
+One area is the normal unit of agent ownership. Its tasks are the units of review
+and commit history. This keeps context bounded while allowing one agent to retain
+the local knowledge needed for three or four related commits.
+
+Only one agent may write to an area branch at a time. If an area is handed to a
+new agent, the previous owner must stop, push its last coherent commit, and send a
+handoff report. The coordinator records the handoff before the new agent starts.
+
+Independent areas may run in parallel when all their external dependencies are
+already integrated into `main` and they do not contend for an explicitly shared
+resource. Typical collision points include migrations, dependency lockfiles,
+public DTO contracts, CI configuration, and application-wide design tokens.
+
+## Dependency rules
+
+- A dependency in another area must be verified as integrated in `main` before a
+  consumer area branch is created.
+- An accepted decision may satisfy a decision dependency only when its final rule
+  and affected contracts have been recorded.
+- A dependency within the same area may be satisfied by a verified earlier commit
+  on the same branch.
+- Pull requests are not dependency boundaries. Do not build a consumer branch on
+  top of another open pull request unless the project owner explicitly approves a
+  stacked-branch exception.
+- If an upstream contract must change, the agent stops and reports the impact. The
+  coordinator decides whether to reopen the upstream area or create a bounded task.
+
+The coordinator may prepare independent UI foundations and persistence foundations
+in parallel, but it must not assign a frontend integration before the API contract
+it consumes is integrated.
+
+## Area lifecycle
+
+### 1. Readiness review
+
+Before opening an area, the coordinator verifies:
+
+1. The local checkout is clean and `main` matches the intended remote base.
+2. Every external dependency required by the entire area is integrated.
+3. Every blocking product decision is explicitly accepted.
+4. No active agent owns the proposed branch or overlapping scope.
+5. The branch name, task order, and expected pull request target are recorded.
+
+The coordinator then changes the first eligible task from `PENDIENTE` to `LISTA`
+or `EN_CURSO` in the private board and records the owner and start date. These
+Spanish labels are quoted exactly because they are the canonical values used by
+the private Spanish task board.
+
+### 2. Worktree provisioning
+
+The coordinator creates a dedicated branch and worktree from updated `main` using
+the naming rules in `AGENTS.md`. The repository-local `post-checkout` hook links
+the shared private planning files into the new worktree.
+
+The assigned agent verifies before editing:
+
+```bash
+git status --short --branch
+git check-ignore -v \
+  docs/07-user-story-backlog.md \
+  docs/08-agent-implementation-tasks.md
+readlink -f docs/08-agent-implementation-tasks.md
+```
+
+If either private path is missing, is not ignored, or is a regular tracked file,
+the agent stops and reports the condition. It must not recreate the private data
+from memory or publish a replacement.
+
+### 3. Task implementation
+
+Before each task, the implementation agent reads only the context routed by its
+task card plus mandatory repository policies. It checks the preceding commit and
+confirms that the task is still unclaimed and applicable.
+
+The task commit contains:
+
+- the requested implementation and no unrelated refactor;
+- meaningful success, failure, boundary, and important branch tests;
+- migrations or generated files genuinely required by that task;
+- public contract documentation when behavior changes.
+
+Every commit must compile and pass checks relevant to its scope. Testing and
+coverage work follows `docs/05-tests-qa.md`; it is not deferred to a final cleanup
+commit and coverage configuration is never manipulated.
+
+If a task is too large for a reviewable commit, the agent does not silently expand
+it. It proposes derived task IDs and boundaries to the coordinator, who updates
+the private board before implementation continues.
+
+### 4. Task report and verification
+
+After committing and pushing a task, the agent sends this report:
+
+```text
+Task: TX-02
+Status: ready for verification
+Branch: feature/add-transaction-business-services
+Commit: <full-or-short-sha>
+
+Implemented:
+- <meaningful behavior>
+
+Verification:
+- <command>: <passed/failed and relevant count>
+- Line coverage: <value>
+- Branch coverage: <value>
+- Remaining uncovered lines/branches: <paths and reason, or none>
+
+Blockers:
+- <concrete blocker, or none>
+
+Suggested next task:
+- <task id and immediate action>
+```
+
+The report must contain observed results, never planned commands presented as if
+they ran. If direct agent-to-coordinator messaging is unavailable, the agent
+returns the same report to the project owner for forwarding.
+
+The coordinator checks the branch, diff, commit, tests, coverage, and task contract.
+It then updates the private board:
+
+- `VERIFICADA` when implementation and evidence satisfy the task;
+- `BLOQUEADA` with a concrete owner and next action when progress cannot continue;
+- remains `EN_CURSO` when corrections are still required.
+
+Only after this update may the agent begin the next task in the area.
+
+### 5. Pull request
+
+When every implementation task in the area is verified, its owner opens one pull
+request against `main`. This project workflow authorizes that area pull request;
+it does not authorize pull requests for unrelated work or automatic merging.
+
+The pull request:
+
+- contains the individual task commits from that area;
+- uses English title, summary, checklist, and review discussion;
+- describes behavior and public requirements without copying private backlog text;
+- reports tests, line and branch coverage, remaining gaps, migrations, and risks;
+- waits for all configured GitHub Actions checks.
+
+The coordinator records the pull request as `EN_PR`. Review corrections stay on
+the same area branch and are associated with the affected task. The resulting
+history should retain meaningful task boundaries; fixup commits may be squashed
+into their task before merge when this can be done without disrupting another
+agent.
+
+Neither the coordinator nor the implementation agent merges without explicit
+project-owner authorization.
+
+### 6. Integration and cleanup
+
+After the authorized merge, the coordinator:
+
+1. Fetches the remote and updates its `main` with a fast-forward pull.
+2. Verifies that the expected implementation and checks are present on `main`.
+3. Records the resulting integration commit and marks the area tasks `INTEGRADA`.
+4. Makes newly satisfied dependent tasks ready.
+5. Removes the completed worktree after confirming it has no uncommitted changes.
+6. Removes local or remote branches only when that cleanup is safe and authorized.
+
+An open or merged pull request is not sufficient evidence by itself. If the code
+is missing from `main`, reverted, or its required checks failed, the task is not
+marked integrated.
+
+## Blocking and escalation
+
+An implementation agent stops and reports instead of guessing when:
+
+- an acceptance rule has more than one materially different interpretation;
+- a required dependency is absent from `main`;
+- existing user changes overlap the assigned files;
+- implementation requires changing a contract owned by another area;
+- a migration or destructive operation has an unclear target;
+- tests expose a pre-existing failure that prevents reliable verification;
+- credentials, infrastructure access, or product-owner authority are required.
+
+A useful blocker report states the observed evidence, affected task IDs, options,
+recommended next action, and who can resolve it. The coordinator updates the board
+and either reassigns independent work or asks the project owner for a decision.
+
+## Private-board update rules
+
+Implementation agents see updates immediately through the shared symbolic links,
+but they never edit those files. The coordinator updates the board:
+
+- when reserving or handing off a task;
+- after checking each task report and commit;
+- when a blocker appears or is resolved;
+- when a pull request opens or CI changes status;
+- after confirming integration into `main`.
+
+The coordinator records responsible agent, branch, commit, commands, coverage,
+uncovered paths, blocker, next action, pull request, and integration evidence. It
+does not invent missing SHAs, test results, or timestamps.
+
+The single-editor restriction is operational rather than a Unix permission: all
+agents on the VPS normally use the same operating-system account. If the project
+owner reassigns the coordinator, the previous editor finishes its write first and
+the new editor rereads the canonical document before updating it.
+
+## Session completion checklist
+
+### Implementation agent
+
+- Work is limited to the assigned task and branch.
+- Relevant checks and the complete required suite were actually run.
+- Coverage and remaining gaps are reported without manipulation.
+- The task commit and push are identifiable.
+- No private planning file is staged or published.
+- The coordinator received a report and a concrete next step.
+
+### Coordinating agent
+
+- The private board matches observable Git and CI state.
+- No area, branch, worktree, or shared file has multiple owners.
+- Newly ready work respects integrated dependencies and accepted decisions.
+- Pull requests are not merged without project-owner authorization.
+- Completed worktrees are removed only after checking for local changes.

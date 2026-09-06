@@ -2,6 +2,23 @@
 
 These instructions are mandatory for every agent that modifies this repository.
 
+## Multi-agent collaboration
+
+When work is coordinated across agents or worktrees, read and follow
+[`docs/agent-collaboration-workflow.md`](docs/agent-collaboration-workflow.md) in
+full before starting. It defines ownership, dependency gates, task reporting,
+pull request lifecycle, integration, and handoff rules.
+
+- One implementation agent owns an area branch at a time.
+- Each active area uses a separate worktree.
+- Implementation agents treat the local private backlog and task board as
+  read-only and report evidence to the coordinating agent.
+- Only the coordinating agent updates private task status and coordination data.
+- Independent areas may run in parallel only after their external dependencies
+  are integrated into `main` and shared-file ownership is clear.
+- A completed planned area may open its single documented pull request to `main`;
+  no agent may merge it without explicit project-owner authorization.
+
 ## Language policy
 
 - Write all source code in English.
@@ -113,7 +130,9 @@ Those rules are mandatory. In particular:
    `git push -u origin <branch-name>`.
 6. Do not open or create a pull request unless the user explicitly requests one.
    If requested, write its title, description, checklist, and subsequent review
-   discussion in English.
+   discussion in English. The planned-area authorization defined in the
+   collaboration workflow applies only when an agent was assigned that area by
+   the coordinator; it does not authorize unrelated pull requests.
 
 When the user has requested work on `main`, do not commit or push unless the user
 explicitly requests it. When reporting completion for a branch workflow, include

@@ -2,6 +2,8 @@
 
 Read and follow [AGENTS.md](AGENTS.md) in full before modifying this repository.
 Its language, branching, validation, commit, and push policies are mandatory.
+For coordinated work across agents or worktrees, also read and follow
+[the agent collaboration workflow](docs/agent-collaboration-workflow.md) in full.
 
 Operational summary:
 
@@ -30,10 +32,13 @@ Operational summary:
     coverage; require meaningful assertions and report line/branch coverage.
 13. Run and validate all relevant tests before finishing.
 14. Use `feat: <short English title>` for functionality,
-   `fix: <short English title>` for fixes, and
-   `chore: <short English title>` for maintenance, tooling, or scaffolding.
+    `fix: <short English title>` for fixes, and
+    `chore: <short English title>` for maintenance, tooling, or scaffolding.
 15. Push an authorized task branch after committing.
 16. Do not create a pull request unless the user explicitly requests one. If
     requested, write all PR metadata and review discussion in English.
+17. In multi-agent work, one agent owns an area branch, only the coordinator edits
+    private planning state, and implementation agents report verifiable results
+    using the collaboration workflow. Never merge without explicit owner approval.
 
 If this summary differs from `AGENTS.md`, `AGENTS.md` takes precedence.
