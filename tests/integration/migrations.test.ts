@@ -17,6 +17,7 @@ import {
   applyMigrations,
 } from "../../src/shared/server/migrate";
 import {
+  COMMITTED_MIGRATION_TAGS,
   createTemporaryMigrationFolder,
   writeMigrationJournal,
 } from "./helpers/migrations";
@@ -88,27 +89,35 @@ describe("applyMigrations", () => {
     expect(result).toEqual({
       ok: true,
       value: {
-        applied: ["0000_workspace_and_preference"],
+        applied: [...COMMITTED_MIGRATION_TAGS],
         skipped: [],
       },
     });
-    expect(recordedTags(connection)).toEqual(["0000_workspace_and_preference"]);
+    expect(recordedTags(connection)).toEqual([...COMMITTED_MIGRATION_TAGS]);
     expect(
       connection.sqlite
         .prepare(
-          "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'workspace'",
+          "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('workspace', 'category', 'tag', 'transaction', 'transaction_tag') ORDER BY name",
         )
-        .get(),
-    ).toEqual({ name: "workspace" });
+        .all(),
+    ).toEqual([
+      { name: "category" },
+      { name: "tag" },
+      { name: "transaction" },
+      { name: "transaction_tag" },
+      { name: "workspace" },
+    ]);
     connection.close();
   });
 
   it("skips already applied files after a restart when the hash matches", () => {
     const { filePath } = temporarySqliteFile();
-    const sqlText = readFileSync(
-      join(DEFAULT_MIGRATIONS_FOLDER, "0000_workspace_and_preference.sql"),
-      "utf8",
-    );
+    const hashes = COMMITTED_MIGRATION_TAGS.map((tag) => ({
+      tag,
+      hash: sha256(
+        readFileSync(join(DEFAULT_MIGRATIONS_FOLDER, `${tag}.sql`), "utf8"),
+      ),
+    }));
     const first = requireOpen(filePath);
     expect(applyMigrations(first).ok).toBe(true);
     first.close();
@@ -120,15 +129,10 @@ describe("applyMigrations", () => {
       ok: true,
       value: {
         applied: [],
-        skipped: ["0000_workspace_and_preference"],
+        skipped: [...COMMITTED_MIGRATION_TAGS],
       },
     });
-    expect(recordedLedger(second)).toEqual([
-      {
-        tag: "0000_workspace_and_preference",
-        hash: sha256(sqlText),
-      },
-    ]);
+    expect(recordedLedger(second)).toEqual(hashes);
     second.close();
   });
 

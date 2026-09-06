@@ -18,6 +18,7 @@ import {
 import { initializeDatabase } from "../../src/shared/server/initialize";
 import { applyMigrations } from "../../src/shared/server/migrate";
 import {
+  COMMITTED_MIGRATION_TAGS,
   createTemporaryMigrationFolder,
   writeMigrationJournal,
 } from "./helpers/migrations";
@@ -67,7 +68,7 @@ describe("initializeDatabase", () => {
       return;
     }
 
-    expect(result.value.applied).toEqual(["0000_workspace_and_preference"]);
+    expect(result.value.applied).toEqual([...COMMITTED_MIGRATION_TAGS]);
     expect(result.value.skipped).toEqual([]);
     expect(result.value.createdWorkspace).toBe(true);
     expect(isIdentifier(result.value.workspaceId)).toBe(true);
@@ -105,7 +106,7 @@ describe("initializeDatabase", () => {
       ok: true,
       value: {
         applied: [],
-        skipped: ["0000_workspace_and_preference"],
+        skipped: [...COMMITTED_MIGRATION_TAGS],
         workspaceId: created.value.workspaceId,
         createdWorkspace: false,
       },

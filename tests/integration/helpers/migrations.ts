@@ -7,6 +7,12 @@ import { join } from "node:path";
 
 import { createTemporarySqliteFile } from "./sqlite";
 
+/** Tags of the committed drizzle-kit journal, in apply order. */
+export const COMMITTED_MIGRATION_TAGS = [
+  "0000_workspace_and_preference",
+  "0001_classification_and_transactions",
+] as const;
+
 /** Isolated folder that looks like a drizzle-kit output directory. */
 export function createTemporaryMigrationFolder(): {
   readonly folder: string;

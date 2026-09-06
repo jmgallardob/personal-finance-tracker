@@ -8,6 +8,13 @@
       "when": 1788719265006,
       "tag": "0000_workspace_and_preference",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1788720218288,
+      "tag": "0001_classification_and_transactions",
+      "breakpoints": true
     }
   ]
 }
