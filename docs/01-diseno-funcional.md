@@ -1,6 +1,6 @@
 # Diseño funcional
 
-**Estado:** aceptado v1.6
+**Estado:** aceptado v1.7
 
 **Alcance:** MVP de registro, recurrencias mensuales y visualización de finanzas
 cotidianas.
@@ -75,19 +75,84 @@ desactivar después de una confirmación.
 
 ### Datos de un movimiento
 
-| Campo | Obligatorio | Regla |
-| --- | --- | --- |
-| Tipo | Sí | `gasto` o `ingreso` |
-| Importe | Sí | mayor que cero, expresado en EUR |
-| Fecha | Sí | pasada o actual; formato visual `dd/mm/yyyy` |
-| Categoría | Sí | compatible con el tipo del movimiento |
-| Concepto | No | texto breve para reconocer el movimiento |
-| Nota | No | contexto adicional de texto libre |
-| Etiquetas | No | colección sin duplicados de cero o más etiquetas |
+| Campo | Obligatorio | Regla | Límite aceptado |
+| --- | --- | --- | --- |
+| Tipo | Sí | `gasto` o `ingreso` | dos valores; no admite otros |
+| Importe | Sí | mayor que cero, expresado en EUR | de 0,01 € a 999.999.999,99 € |
+| Fecha | Sí | pasada o actual; formato visual `dd/mm/yyyy` | hasta hoy en `Europe/Madrid` |
+| Categoría | Sí | compatible con el tipo del movimiento | exactamente una |
+| Concepto | No | texto breve para reconocer el movimiento | 200 caracteres |
+| Nota | No | contexto adicional de texto libre | 2.000 caracteres |
+| Etiquetas | No | colección sin duplicados de cero o más etiquetas | 20 etiquetas por movimiento |
 
 El signo no se introduce manualmente: el tipo determina si el movimiento suma a
 ingresos o gastos. Las fechas futuras se reservan para un futuro módulo de
 planificación.
+
+Los límites de texto se cuentan en puntos de código Unicode después de
+aplicar la normalización descrita más abajo, no sobre el texto tal como se
+tecleó.
+
+### Importes aceptados y formato de entrada
+
+El importe se teclea con convención española: la coma separa los decimales y el
+punto agrupa los millares. La aplicación convierte el texto a céntimos enteros;
+nunca interpreta el valor como número en punto flotante.
+
+Se acepta un importe cuando cumple todas estas condiciones:
+
+- contiene solo dígitos, puntos de millar opcionales y, como mucho, una coma
+  decimal con uno o dos decimales;
+- si usa puntos de millar, todos los grupos posteriores al primero tienen
+  exactamente tres dígitos;
+- una vez convertido queda entre 0,01 € y 999.999.999,99 €, ambos inclusive.
+
+Se rechaza cualquier separador ambiguo, un importe cero o negativo, más de dos
+decimales, el símbolo de moneda, los espacios internos y el texto libre. El
+formulario conserva lo introducido y señala el campo en vez de corregirlo por su
+cuenta.
+
+| Entrada | Resultado |
+| --- | --- |
+| `0,01` | aceptada; 1 céntimo |
+| `1234,5` | aceptada; 123.450 céntimos |
+| `1.234,56` | aceptada; 123.456 céntimos |
+| `999.999.999,99` | aceptada; 99.999.999.999 céntimos, máximo del MVP |
+| `1.000.000.000,00` | rechazada; supera el máximo por movimiento |
+| `12.50` | rechazada; punto decimal ambiguo |
+| `1.23` | rechazada; grupo de millar incompleto |
+| `12,345` | rechazada; más de dos decimales |
+| `0` y `0,00` | rechazadas; el importe debe ser mayor que cero |
+| `-5,00` | rechazada; el signo lo determina el tipo |
+| `1 234,56` y `12,5 €` | rechazadas; espacio interno y símbolo de moneda |
+
+Las sumas y medias se calculan sobre céntimos enteros exactos. Antes de exponer
+un total la aplicación comprueba que sigue siendo representable sin pérdida de
+precisión; si un agregado excediera ese margen devuelve un error controlado y no
+una cifra aproximada.
+
+### Normalización de texto
+
+- Nombres de categoría y etiqueta: se recortan los extremos, se normalizan a
+  Unicode NFC y las secuencias de espacios internos se reducen a un solo
+  espacio. La unicidad se compara en minúsculas sobre ese nombre normalizado,
+  conservando las tildes: `Café` y `café` son el mismo nombre, pero `cafe` y
+  `café` son nombres distintos. Se conserva la forma escrita por el usuario
+  para mostrarla.
+- Concepto y nota: se recortan los extremos y se normalizan a Unicode NFC,
+  conservando tildes, mayúsculas y espacios internos.
+- Se rechazan los caracteres de control no imprimibles en todos estos campos. La
+  única excepción son los saltos de línea de la nota, que se guardan como `\n`.
+- Un nombre que quede vacío tras normalizar se rechaza como campo obligatorio.
+
+### Duplicar un movimiento
+
+Duplicar abre un formulario precargado con el tipo, importe, categoría,
+concepto, nota, etiquetas y la fecha original del movimiento de origen. La copia
+no hereda nunca la recurrencia: no se enlaza a ninguna regla ni a un vencimiento
+generado, de modo que duplicar una entrada automática produce un movimiento
+manual corriente. Nada se guarda hasta confirmar y el movimiento original no se
+modifica.
 
 ### Categorías iniciales
 
@@ -104,17 +169,29 @@ salud, cuidado personal, casa, regalos, viajes, ocio y otros.
 El usuario puede crear, editar, ordenar y archivar categorías. Una categoría con
 movimientos no se elimina: se archiva y sigue apareciendo en el histórico.
 
+- El tipo de una categoría se fija al crearla y no cambia después. Para
+  reclasificar gastos como ingresos, o al revés, se crea otra categoría del tipo
+  correcto y se editan los movimientos afectados.
+- Renombrar respeta la unicidad del nombre normalizado entre las categorías
+  activas del mismo tipo y no altera importes ni asociaciones.
+- El orden se define solo entre las categorías activas de un mismo tipo; las
+  archivadas quedan fuera de la ordenación y conservan su posición anterior.
+- El nombre de una categoría admite hasta 80 caracteres.
+
 ### Etiquetas
 
 Las etiquetas aportan contexto transversal sin sustituir a la categoría. Ejemplos:
 `vacaciones`, `trabajo`, `Madrid`, `Navidad` o `con amigos`.
 
 - Se crean al escribir o se seleccionan entre las existentes.
-- Su nombre es único sin distinguir mayúsculas/minúsculas.
-- Un movimiento puede tener varias etiquetas.
+- Su nombre es único sin distinguir mayúsculas/minúsculas, admite hasta 80
+  caracteres y se compara ya normalizado.
+- Un movimiento puede tener varias etiquetas, hasta un máximo de 20.
 - Los filtros con varias etiquetas usan semántica **OR**: aparece un movimiento
   si contiene cualquiera de las seleccionadas.
 - Una etiqueta puede renombrarse y archivarse sin modificar el histórico.
+- Una etiqueta archivada que ya estaba en un movimiento puede conservarse al
+  editarlo; si se quita, no vuelve a poder añadirse.
 - El dashboard atribuye el importe completo a cada etiqueta: un gasto de 60 € con
   dos tags contabiliza 60 € en cada uno. Por ello, la suma de una gráfica por
   etiquetas puede superar el gasto total. La interfaz debe explicar el solape y
@@ -197,11 +274,11 @@ de demostración no deben mezclarse accidentalmente con datos personales.
 
 | ID | Historia | Criterio principal de aceptación |
 | --- | --- | --- |
-| F-01 | Registrar un gasto rápidamente | Con los cuatro campos obligatorios se guarda y actualiza el dashboard |
+| F-01 | Registrar un gasto rápidamente | Con los cuatro campos obligatorios, dentro de los límites aceptados, se guarda y actualiza el dashboard |
 | F-02 | Registrar un ingreso | Se refleja en ingresos y balance del periodo correspondiente |
-| F-03 | Corregir un movimiento | La edición recalcula todas las métricas afectadas |
+| F-03 | Corregir un movimiento | La edición aplica las reglas del alta, permite conservar la clasificación archivada previa y recalcula todas las métricas afectadas |
 | F-04 | Eliminar un movimiento | Se pide confirmación y desaparece de historial y estadísticas |
-| F-05 | Duplicar un movimiento | Se abre una copia editable que no se guarda hasta confirmar |
+| F-05 | Duplicar un movimiento | Se abre una copia editable con la fecha original y sin recurrencia, que no se guarda hasta confirmar |
 | F-06 | Encontrar movimientos | Búsqueda y filtros, incluido un rango diario exacto, producen un listado coherente y combinable |
 | F-07 | Entender el periodo | Dashboard muestra ingresos, gastos, neto y comparativa correctos |
 | F-08 | Analizar categorías | Una categoría abre exactamente los gastos que componen su cifra |
@@ -242,6 +319,24 @@ de demostración no deben mezclarse accidentalmente con datos personales.
     esas fechas en `Europe/Madrid`; no modifican el periodo activo del dashboard.
 16. Una comparación nunca enfrenta el mes actual parcial con un mes anterior
     completo; utiliza intervalos equivalentes.
+17. Un movimiento admite entre 1 céntimo y 99.999.999.999 céntimos
+    (999.999.999,99 €). El texto del importe sigue la convención española y se
+    rechaza cualquier separador ambiguo.
+18. Las agregaciones suman céntimos enteros exactos y comprueban el
+    desbordamiento antes de publicar un total; un agregado no representable
+    devuelve un error controlado en lugar de una cifra redondeada.
+19. Concepto admite 200 caracteres, la nota 2.000, los nombres de categoría y
+    etiqueta 80, y un movimiento admite como máximo 20 etiquetas.
+20. Los nombres de categoría y etiqueta se guardan recortados, en Unicode NFC y
+    con los espacios internos colapsados; su unicidad se compara en minúsculas
+    conservando las tildes. Los campos de texto rechazan controles no
+    imprimibles, salvo los saltos de línea de la nota.
+21. El tipo de una categoría es inmutable; un cambio de tipo del movimiento
+    exige elegir una categoría activa compatible con el nuevo tipo.
+22. Al editar un movimiento se puede conservar la categoría o las etiquetas
+    archivadas que ya tenía, pero no asignarle otras archivadas distintas.
+23. Duplicar copia los valores y la fecha del movimiento de origen y nunca su
+    regla de recurrencia ni su vencimiento generado.
 
 ## Fuera del MVP
 

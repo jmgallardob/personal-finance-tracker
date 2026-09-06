@@ -1,6 +1,6 @@
 # Diseño técnico
 
-**Estado:** aceptado v1.5 para el MVP
+**Estado:** aceptado v1.6 para el MVP
 
 **Enfoque:** monolito modular privado, desplegable como una única aplicación.
 
@@ -69,19 +69,45 @@ el esquema inicial.
 
 ### Invariantes
 
-- `amount_minor INTEGER > 0` —entero de 64 bits de SQLite— y moneda fija
-  `EUR`.
+- `amount_minor INTEGER` entre `1` y `99999999999` —entero de 64 bits de
+  SQLite— y moneda fija `EUR`.
 - `type` solo admite `income` o `expense`.
 - La categoría pertenece al mismo workspace y coincide con el tipo.
 - Un movimiento no puede repetir una etiqueta.
 - Fecha efectiva como texto ISO `YYYY-MM-DD`; marcas técnicas como enteros Unix
   en milisegundos UTC.
 - Los nombres normalizados de categorías y tags activos son únicos dentro de su
-  ámbito y workspace.
+  ámbito y workspace: por tipo en categorías y global en tags.
+- El nombre normalizado se guarda aparte del nombre de presentación y se obtiene
+  recortando, aplicando Unicode NFC, colapsando espacios internos y pasando a
+  minúsculas sin eliminar diacríticos.
+- `category.type` es inmutable: ninguna mutación del MVP lo modifica.
+- Longitudes máximas en puntos de código sobre el texto ya normalizado:
+  concepto 200, nota 2.000, nombre de categoría o tag 80, y como mucho 20 filas
+  de `TransactionTag` por movimiento.
 - El archivado conserva asociaciones históricas.
 - Cada mutación y sus asociaciones se confirman en una transacción SQL.
 - Cada movimiento automático guarda `recurring_rule_id` y `scheduled_for`; una
   restricción única sobre ambos campos impide duplicar un vencimiento.
+
+## Contrato de validación de importes y texto
+
+La conversión de importes vive en el dominio y no usa `parseFloat` ni
+redondeo implícito. Acepta el texto que cumpla
+`^\d{1,3}(\.\d{3})*(,\d{1,2})?$` o `^\d+(,\d{1,2})?$` tras recortar los
+extremos, y rechaza cualquier otra forma —punto decimal, grupos de millar
+incompletos, más de dos decimales, signo, símbolo de moneda o espacios internos—
+con un error de campo. El resultado es un entero de céntimos dentro de
+`[1, 99999999999]`.
+
+Las agregaciones acumulan céntimos como enteros y verifican el rango seguro
+antes de serializar un total en JSON. Cuando la suma exacta supera
+`Number.MAX_SAFE_INTEGER` la consulta devuelve un error controlado en lugar de
+un número impreciso; ninguna capa convierte céntimos a coma flotante para sumar.
+
+La normalización de texto se aplica en el dominio antes de validar longitudes y
+antes de escribir. Los caracteres de control no imprimibles se rechazan; la nota
+es el único campo que admite saltos de línea y los normaliza a `\n`.
 
 ## Capas
 
@@ -166,8 +192,27 @@ base de datos en el MVP.
 
 ### Duplicar
 
-Duplicar no persiste inmediatamente. Devuelve o abre un formulario precargado,
-con identificador nuevo solo después de que el usuario confirme.
+Duplicar no persiste inmediatamente. Devuelve o abre un formulario precargado
+con tipo, importe, categoría, concepto, nota, tags y la fecha del movimiento de
+origen, con identificador nuevo solo después de que el usuario confirme. La
+copia no arrastra la recurrencia: `recurring_rule_id` y `scheduled_for` quedan
+nulos aunque el origen fuese una entrada generada.
+
+### Clasificación archivada al editar
+
+La validación de una mutación compara la clasificación entrante con la que el
+movimiento ya tenía:
+
+- una categoría o un tag archivados se aceptan solo si ya estaban asociados a
+  ese movimiento antes de la edición;
+- cualquier otra categoría o tag archivados se rechazan, igual que en un alta;
+- quitar un tag archivado es válido, pero volver a añadirlo ya no lo es;
+- si la mutación cambia `type`, exige una categoría activa compatible con el
+  nuevo tipo; conservar la categoría anterior deja de ser posible.
+
+La reordenación recibe la lista completa de identificadores de categorías
+activas de un solo tipo, sin duplicados ni identificadores ajenos. Las
+categorías archivadas no participan en la ordenación.
 
 ### Eliminar
 
