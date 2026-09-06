@@ -11,8 +11,8 @@ una decisión explícita y la documentación debe actualizarse en el mismo cambi
 
 | Documento                                                              | Pregunta que responde                                           | Estado           |
 | ---------------------------------------------------------------------- | --------------------------------------------------------------- | ---------------- |
-| [Diseño funcional](01-diseno-funcional.md)                             | ¿Qué problema resuelve y qué puede hacer el usuario?            | Aceptado v1.6    |
-| [Diseño técnico](02-diseno-tecnico.md)                                 | ¿Cómo se organiza el sistema y sus datos?                       | Aceptado v1.5    |
+| [Diseño funcional](01-diseno-funcional.md)                             | ¿Qué problema resuelve y qué puede hacer el usuario?            | Aceptado v1.9    |
+| [Diseño técnico](02-diseno-tecnico.md)                                 | ¿Cómo se organiza el sistema y sus datos?                       | Aceptado v1.8    |
 | [Stack tecnológico](03-stack-tecnologico.md)                           | ¿Con qué tecnologías y por qué?                                 | Aceptado v1.0    |
 | [Diseño visual y UX](04-diseno-visual-ux.md)                           | ¿Cómo se ve, se entiende y se utiliza?                          | Aceptado v1.6    |
 | [Referencia visual](design/references/revolut/README.md)               | ¿Qué materiales visuales inspiran el sistema y cómo se adaptan? | Referencia local |
